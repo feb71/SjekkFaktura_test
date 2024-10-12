@@ -29,9 +29,9 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                 text = page.extract_text()
                 lines = text.split('\n')
                 
-                # Finne startpunkt for innlesning ved å identifisere kolonnenavn
+                # Finne startpunkt for innlesning ved å identifisere kolonneoverskrifter
                 for line in lines:
-                    # Vi ser etter linjen med kolonneoverskrifter: "Nummer", "Beskrivelse", "Antall", "Enhet", "Pris", "Beløp"
+                    # Vi ser etter linjen med kolonneoverskriftene: "Nummer", "Beskrivelse", "Antall", "Enhet", "Pris", "Beløp"
                     if "Nummer" in line and "Beskrivelse" in line:
                         start_reading = True
                         continue
@@ -41,12 +41,12 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                         # Sjekk om linjen inneholder nok kolonner og om første element er et varenummer
                         if len(columns) >= 6 and columns[0].isdigit():
                             item_number = columns[0]  # Nummer = Varenummer
-                            description = " ".join(columns[1:-4])  # Beskrivelse
+                            description = " ".join(columns[1:-5])  # Beskrivelse
                             
                             try:
-                                total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1] else None
-                                unit_price = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2] else None
-                                quantity = float(columns[-4].replace(',', '.')) if columns[-4] else None
+                                quantity = float(columns[-5].replace(',', '.'))  # Antall
+                                unit_price = float(columns[-2].replace('.', '').replace(',', '.'))  # Enhetspris
+                                total_price = float(columns[-1].replace('.', '').replace(',', '.'))  # Beløp
                             except ValueError as e:
                                 st.error(f"Kunne ikke konvertere til flyttall: {e}")
                                 continue

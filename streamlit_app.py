@@ -26,46 +26,44 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
             start_reading = False
 
             for page in pdf.pages:
-                # Ekstraher tabeller fra PDF-siden
-                tables = page.extract_table()
-                if not tables:
-                    st.error(f"Ingen tabeller funnet på side {page.page_number} i PDF-filen.")
-                    continue
+                text = page.extract_text()
+                lines = text.split('\n')
+                
+                # Finne startpunkt for innlesning ved å identifisere kolonnenavn
+                for line in lines:
+                    # Vi ser etter linjen med kolonneoverskrifter: "Nummer", "Beskrivelse", "Antall", "Enhet", "Pris", "Beløp"
+                    if "Nummer" in line and "Beskrivelse" in line:
+                        start_reading = True
+                        continue
+                    
+                    if start_reading:
+                        columns = line.split()
+                        # Sjekk om linjen inneholder nok kolonner og om første element er et varenummer
+                        if len(columns) >= 6 and columns[0].isdigit():
+                            item_number = columns[0]  # Nummer = Varenummer
+                            description = " ".join(columns[1:-4])  # Beskrivelse
+                            
+                            try:
+                                total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1] else None
+                                unit_price = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2] else None
+                                quantity = float(columns[-4].replace(',', '.')) if columns[-4] else None
+                            except ValueError as e:
+                                st.error(f"Kunne ikke konvertere til flyttall: {e}")
+                                continue
+                            
+                            # Lagre data i riktig format
+                            unique_id = f"{invoice_number}_{item_number}" if invoice_number else item_number
+                            data.append({
+                                "UnikID": unique_id,
+                                "Varenummer": item_number,
+                                "Beskrivelse_Faktura": description,
+                                "Antall_Faktura": quantity,
+                                "Enhetspris_Faktura": unit_price,
+                                "Totalt pris": total_price,
+                                "Type": doc_type
+                            })
 
-                # Hver rad i tabellen
-                for row in tables:
-                    # Vi sjekker først om det er riktig rad, det må være minst 8 kolonner
-                    if len(row) >= 8:
-                        item_number = row[0]  # Nummer = Varenummer
-                        if not item_number.isdigit():
-                            continue
-                        description = row[2]  # Beskrivelse
-
-                        try:
-                            # Pris = Enhetspris, Beløp = Totalt pris, og antall kan beregnes
-                            total_price = float(row[-1].replace('.', '').replace(',', '.')) if row[-1] else None
-                            unit_price = float(row[-3].replace('.', '').replace(',', '.')) if row[-3] else None
-
-                            # Antall kan beregnes ved å dele beløp på pris
-                            if total_price and unit_price:
-                                quantity = total_price / unit_price
-                            else:
-                                quantity = None
-                        except ValueError as e:
-                            st.error(f"Kunne ikke konvertere til flyttall: {e}")
-                            continue
-
-                        unique_id = f"{invoice_number}_{item_number}" if invoice_number else item_number
-                        data.append({
-                            "UnikID": unique_id,
-                            "Varenummer": item_number,
-                            "Beskrivelse_Faktura": description,
-                            "Antall_Faktura": quantity,
-                            "Enhetspris_Faktura": unit_price,
-                            "Totalt pris": total_price,
-                            "Type": doc_type
-                        })
-
+            # Hvis ingen data ble funnet
             if len(data) == 0:
                 st.error("Ingen data ble funnet i PDF-filen.")
                 
@@ -77,8 +75,12 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
 # Funksjon for å sammenligne faktura med tilbud
 def compare_invoice_offer(invoice_data, offer_data):
     # Merge faktura og tilbud på varenummer
-    merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
-    
+    try:
+        merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
+    except KeyError as e:
+        st.error(f"Feil under sammenslåing: {e}")
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
     # Konverter kolonner til numerisk for å sikre korrekt beregning
     merged_data["Antall_Faktura"] = pd.to_numeric(merged_data["Antall_Faktura"], errors='coerce')
     merged_data["Antall_Tilbud"] = pd.to_numeric(merged_data["Antall_Tilbud"], errors='coerce')

@@ -41,15 +41,16 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
 
                     if start_reading:
                         columns = line.split()
-                        if len(columns) >= 5:
+                        if len(columns) >= 7:  # Kontroller at vi har alle kolonnene (Artikkel, Beskrivelse, Antall, Enhetspris, Rabatt, Totaltpris)
                             item_number = columns[1]
                             if not item_number.isdigit():
                                 continue
 
-                            description = " ".join(columns[2:-3])
+                            description = " ".join(columns[2:-5])
                             try:
-                                quantity = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else columns[-3]
-                                unit_price = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else columns[-2]
+                                quantity = float(columns[-5].replace('.', '').replace(',', '.')) if columns[-5].replace('.', '').replace(',', '').isdigit() else columns[-5]
+                                unit_price = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else columns[-4]
+                                discount = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else columns[-3]
                                 total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else columns[-1]
                             except ValueError as e:
                                 st.error(f"Kunne ikke konvertere til flyttall: {e}")
@@ -62,6 +63,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                                 "Beskrivelse_Faktura": description,
                                 "Antall_Faktura": quantity,
                                 "Enhetspris_Faktura": unit_price,
+                                "Rabatt": discount,
                                 "Totalt pris": total_price,
                                 "Type": doc_type
                             })
@@ -162,7 +164,10 @@ def main():
                 # Sammenligne faktura mot tilbud
                 with col2:
                     st.write("Sammenligner data...")
-                merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='inner', suffixes=('_Tilbud', '_Faktura'))
+                merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
+
+                # Fyll ut "Rabatt" for varer som finnes i både tilbud og faktura (null for tilbudet)
+                merged_data["Rabatt_Tilbud"] = merged_data.apply(lambda row: 0 if pd.notna(row["Varenummer"]) else row["Rabatt"], axis=1)
 
                 # Konverter kolonner til numerisk
                 merged_data["Antall_Faktura"] = pd.to_numeric(merged_data["Antall_Faktura"], errors='coerce')
@@ -177,11 +182,20 @@ def main():
 
                 with col2:
                     st.subheader("Avvik mellom Faktura og Tilbud")
-                    st.dataframe(merged_data)
+                                        st.dataframe(merged_data[[
+                        "Varenummer", "Beskrivelse_Tilbud", "Beskrivelse_Faktura", 
+                        "Antall_Tilbud", "Antall_Faktura", "Enhetspris_Tilbud", 
+                        "Enhetspris_Faktura", "Rabatt_Tilbud", "Rabatt", 
+                        "Totalt pris_Tilbud", "Totalt pris_Faktura", 
+                        "Avvik_Antall", "Avvik_Enhetspris", "Prosentvis_økning"
+                    ]])
 
                 # Artikler som finnes i faktura, men ikke i tilbud
                 unmatched_items = pd.merge(offer_data, invoice_data, on="Varenummer", how="outer", indicator=True)
-                only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][["Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris", "Rabatt"]]
+                only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][[
+                    "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", 
+                    "Enhetspris_Faktura", "Rabatt", "Totalt pris"
+                ]]
                 
                 with col2:
                     st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")

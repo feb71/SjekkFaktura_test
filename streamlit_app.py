@@ -182,7 +182,7 @@ def main():
 
                 with col2:
                     st.subheader("Avvik mellom Faktura og Tilbud")
-                                        st.dataframe(merged_data[[
+                    st.dataframe(merged_data[[
                         "Varenummer", "Beskrivelse_Tilbud", "Beskrivelse_Faktura", 
                         "Antall_Tilbud", "Antall_Faktura", "Enhetspris_Tilbud", 
                         "Enhetspris_Faktura", "Rabatt_Tilbud", "Rabatt", 

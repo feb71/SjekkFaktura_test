@@ -4,15 +4,16 @@ import pandas as pd
 from io import BytesIO
 import re
 
-# Funksjon for å lese fakturanummer fra PDF
-def get_invoice_number(file):
+# Funksjon for å lese fakturanummer fra Table005 (side 2)
+def get_invoice_number_from_table(file):
     try:
         with pdfplumber.open(file) as pdf:
             for page in pdf.pages:
-                text = page.extract_text()
-                match = re.search(r"Fakturanummer\s*[:\-]?\s*(\d+)", text, re.IGNORECASE)
-                if match:
-                    return match.group(1)
+                if "Page 2" in page.page_label:
+                    text = page.extract_text()
+                    match = re.search(r"Fakturanummer\s*[:\-]?\s*(\d+)", text, re.IGNORECASE)
+                    if match:
+                        return match.group(1)
         return None
     except Exception as e:
         st.error(f"Kunne ikke lese fakturanummer fra PDF: {e}")
@@ -26,35 +27,28 @@ def is_numeric(value):
     except ValueError:
         return False
 
-# Funksjon for å lese tabeller fra PDF-filen
-def extract_data_from_pdf(file, doc_type, invoice_number=None):
+# Funksjon for å lese varenumre fra Table003 (side 1)
+def extract_item_data_from_pdf(file, doc_type, invoice_number=None):
     try:
         with pdfplumber.open(file) as pdf:
             data = []
-            start_reading = False
-
             for page in pdf.pages:
-                text = page.extract_text()
-                lines = text.split('\n')
-                
-                # Finne startpunkt for innlesning ved å identifisere kolonneoverskrifter
-                for line in lines:
-                    if "Nummer" in line and "Beskrivelse" in line:
-                        start_reading = True
-                        continue
+                if "Page 1" in page.page_label:  # Les fra første side (Table003)
+                    text = page.extract_text()
+                    lines = text.split('\n')
                     
-                    if start_reading:
+                    for line in lines:
                         columns = re.split(r'\s{2,}', line)  # Splitter på store mellomrom (kolonneseparatorer)
                         
                         # Sjekk om linjen inneholder nok kolonner og om første element er et varenummer
-                        if len(columns) >= 6 and columns[0].isdigit():  # Sjekk at første kolonne er et nummer
+                        if len(columns) >= 6 and columns[0].isdigit():  # Sjekk at første kolonne er et nummer (Varenummer)
                             item_number = columns[0]  # Nummer = Varenummer
-                            description = columns[1]  # Beskrivelse (kan være lang, så vi tar hele kolonnen)
+                            description = columns[1]  # Beskrivelse
                             
                             # Kolonnene skal inneholde Antall, Enhet, Pris, Beløp
                             try:
                                 quantity = float(columns[3].replace(',', '.')) if is_numeric(columns[3]) else None  # Antall
-                                unit = columns[4]  # Enhet er tekst, for eksempel "NAR"
+                                unit = columns[4]  # Enhet
                                 unit_price = float(columns[5].replace('.', '').replace(',', '.')) if is_numeric(columns[5]) else None  # Enhetspris
                                 total_price = float(columns[6].replace('.', '').replace(',', '.')) if is_numeric(columns[6]) else None  # Beløp
                             except ValueError as e:
@@ -65,10 +59,10 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                             unique_id = f"{invoice_number}_{item_number}" if invoice_number else item_number
                             data.append({
                                 "UnikID": unique_id,
-                                "Varenummer": item_number,  # Bruk "Varenummer" her for sammenslåing
+                                "Varenummer": item_number,
                                 "Beskrivelse_Faktura": description,
                                 "Antall_Faktura": quantity,
-                                "Enhet_Faktura": unit,  # Enhet er tekst
+                                "Enhet_Faktura": unit,
                                 "Enhetspris_Faktura": unit_price,
                                 "Totalt pris": total_price,
                                 "Type": doc_type
@@ -130,12 +124,12 @@ def main():
     offer_file = st.file_uploader("Last opp tilbud fra Brødrene Dahl (Excel)", type="xlsx")
 
     if invoice_file and offer_file:
-        # Hent fakturanummer
-        invoice_number = get_invoice_number(invoice_file)
+        # Hent fakturanummer fra Table005
+        invoice_number = get_invoice_number_from_table(invoice_file)
 
         if invoice_number:
-            # Ekstraher data fra PDF-filer
-            invoice_data = extract_data_from_pdf(invoice_file, "Faktura", invoice_number)
+            # Ekstraher varenumre og annen informasjon fra Table003
+            invoice_data = extract_item_data_from_pdf(invoice_file, "Faktura", invoice_number)
 
             # Les tilbudsdata
             offer_data = pd.read_excel(offer_file)

@@ -63,7 +63,6 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                                 "Beskrivelse_Faktura": description,
                                 "Antall_Faktura": quantity,
                                 "Enhetspris_Faktura": unit_price,
-                                "Rabatt": discount,
                                 "Totalt pris": total_price,
                                 "Type": doc_type
                             })
@@ -74,17 +73,6 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
     except Exception as e:
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
-
-# Funksjon for å dele opp beskrivelsen basert på siste elementer
-def split_description(data, doc_type):
-    if doc_type == "Faktura":
-        data['Enhet_Faktura'] = data['Beskrivelse_Faktura'].str.extract(r'(\bM2|\bM|\bSTK)$', expand=False)
-        data['Beskrivelse_Faktura'] = data['Beskrivelse_Faktura'].str.replace(r'\s*\b(M2|M|STK)$', '', regex=True)
-
-        data['Antall_Faktura'] = data['Beskrivelse_Faktura'].str.extract(r'(\d+)$', expand=False).astype(float)
-        data['Beskrivelse_Faktura'] = data['Beskrivelse_Faktura'].str.replace(r'\s*\d+$', '', regex=True)
-    
-    return data
 
 # Funksjon for å konvertere DataFrame til en Excel-fil
 def convert_df_to_excel(df):
@@ -158,16 +146,13 @@ def main():
                 'TOTALPRIS': 'Totalt pris'
             }, inplace=True)
 
-            # Del opp beskrivelsen fra fakturaen
             if not invoice_data.empty:
-                invoice_data = split_description(invoice_data, "Faktura")
-
-            if not offer_data.empty:
                 # Sammenligne faktura mot tilbud
                 with col2:
                     st.write("Sammenligner data...")
 
-                merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
+                # Merge data fra tilbud og faktura (bare de som har en match mellom faktura og tilbud)
+                merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='inner', suffixes=('_Tilbud', '_Faktura'))
 
                 # Konverter kolonner til numerisk
                 merged_data["Antall_Faktura"] = pd.to_numeric(merged_data["Antall_Faktura"], errors='coerce')
@@ -175,32 +160,31 @@ def main():
                 merged_data["Enhetspris_Faktura"] = pd.to_numeric(merged_data["Enhetspris_Faktura"], errors='coerce')
                 merged_data["Enhetspris_Tilbud"] = pd.to_numeric(merged_data["Enhetspris_Tilbud"], errors='coerce')
 
-                # Filtrer kun varer som har en match i både tilbud og faktura (dvs. Enhetspris_Tilbud ikke NaN)
-                matched_items = merged_data[merged_data['Enhetspris_Tilbud'].notna()]
-
                 # Beregn avvik
-                matched_items["Avvik_Antall"] = matched_items["Antall_Faktura"] - matched_items["Antall_Tilbud"]
-                matched_items["Avvik_Enhetspris"] = matched_items["Enhetspris_Faktura"] - matched_items["Enhetspris_Tilbud"]
-                matched_items["Prosentvis_økning"] = ((matched_items["Enhetspris_Faktura"] - matched_items["Enhetspris_Tilbud"]) / matched_items["Enhetspris_Tilbud"]) * 100
+                merged_data["Avvik_Antall"] = merged_data["Antall_Faktura"] - merged_data["Antall_Tilbud"]
+                merged_data["Avvik_Enhetspris"] = merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]
+                merged_data["Prosentvis_økning"] = ((merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]) / merged_data["Enhetspris_Tilbud"]) * 100
 
-                # Vis avvik
+                # Vis avvikstabell med bare matchende varenummer
                 with col2:
                     st.subheader("Avvik mellom Faktura og Tilbud")
-                    st.dataframe(matched_items)
+                    st.dataframe(merged_data)
 
                 # Varenummer som finnes i faktura men ikke i tilbud
-                only_in_invoice = merged_data[merged_data['Enhetspris_Tilbud'].isna()]
+                unmatched_items = pd.merge(offer_data, invoice_data, on="Varenummer", how='right', suffixes=('_Tilbud', '_Faktura'), indicator=True)
+                only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only']
+                
                 with col2:
                     st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
                     st.dataframe(only_in_invoice)
 
-                                # Lagre Excel-filer
+                # Lagre Excel-filer
                 excel_data = convert_df_to_excel(invoice_data)
 
                 with col3:
                     st.download_button(
                         label="Last ned avviksrapport som Excel",
-                        data=convert_df_to_excel(matched_items),
+                        data=convert_df_to_excel(merged_data),
                         file_name="avvik_rapport.xlsx"
                     )
                     
@@ -208,16 +192,15 @@ def main():
                         label="Last ned alle varenummer som Excel",
                         data=excel_data,
                         file_name="faktura_varer.xlsx",
-                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                                                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
 
-                    # Legg til rabatt i rapporten for varer som kun finnes i fakturaen
-                    only_in_invoice["Rabatt"] = only_in_invoice["Rabatt"].fillna(0)  # Håndter rabattkolonnen
+                    # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
                     only_in_invoice_data = convert_df_to_excel(only_in_invoice)
                     st.download_button(
-                        label="Last ned varenummer som ikke finnes i tilbudet (med rabatt)",
+                        label="Last ned varenummer som ikke finnes i tilbudet",
                         data=only_in_invoice_data,
-                        file_name="varer_kun_i_faktura_med_rabatt.xlsx",
+                        file_name="varer_kun_i_faktura.xlsx",
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
             else:

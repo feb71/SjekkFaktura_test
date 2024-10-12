@@ -180,7 +180,7 @@ def main():
                 avvik = merged_data[(merged_data["Avvik_Antall"].notna() & (merged_data["Avvik_Antall"] != 0)) |
                                     (merged_data["Avvik_Enhetspris"].notna() & (merged_data["Avvik_Enhetspris"] != 0))]
 
-                               with col2:
+                with col2:
                     st.subheader("Avvik mellom Faktura og Tilbud")
                     st.dataframe(avvik)
 

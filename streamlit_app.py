@@ -188,7 +188,7 @@ def main():
                     st.dataframe(only_in_invoice)
 
                 # Lagre kun artikkeldataene til XLSX
-                                all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris"]]
+                all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris"]]
                 
                 excel_data = convert_df_to_excel(all_items)
 

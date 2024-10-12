@@ -5,3 +5,4 @@ openpyxl
 xlsxwriter
 PyPDF2
 PyMuPDF
+BytesIO

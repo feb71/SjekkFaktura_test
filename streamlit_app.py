@@ -46,10 +46,11 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                             if not item_number.isdigit():
                                 continue
 
-                            description = " ".join(columns[2:-3])
+                            description = " ".join(columns[2:-4])
                             try:
-                                quantity = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else columns[-3]
-                                unit_price = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else columns[-2]
+                                quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else columns[-4]
+                                unit_price = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else columns[-3]
+                                discount = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else columns[-2]
                                 total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else columns[-1]
                             except ValueError as e:
                                 st.error(f"Kunne ikke konvertere til flyttall: {e}")
@@ -62,6 +63,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                                 "Beskrivelse_Faktura": description,
                                 "Antall_Faktura": quantity,
                                 "Enhetspris_Faktura": unit_price,
+                                "Rabatt": discount,
                                 "Totalt pris": total_price,
                                 "Type": doc_type
                             })
@@ -72,17 +74,6 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
     except Exception as e:
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
-
-# Funksjon for å dele opp beskrivelsen basert på siste elementer
-def split_description(data, doc_type):
-    if doc_type == "Faktura":
-        data['Enhet_Faktura'] = data['Beskrivelse_Faktura'].str.extract(r'(\bM2|\bM|\bSTK)$', expand=False)
-        data['Beskrivelse_Faktura'] = data['Beskrivelse_Faktura'].str.replace(r'\s*\b(M2|M|STK)$', '', regex=True)
-
-        data['Antall_Faktura'] = data['Beskrivelse_Faktura'].str.extract(r'(\d+)$', expand=False).astype(float)
-        data['Beskrivelse_Faktura'] = data['Beskrivelse_Faktura'].str.replace(r'\s*\d+$', '', regex=True)
-    
-    return data
 
 # Funksjon for å konvertere DataFrame til en Excel-fil
 def convert_df_to_excel(df):
@@ -154,15 +145,11 @@ def main():
                 'TOTALPRIS': 'Totalt pris'
             }, inplace=True)
 
-            # Del opp beskrivelsen fra fakturaen
-            if not invoice_data.empty:
-                invoice_data = split_description(invoice_data, "Faktura")
-
-            if not offer_data.empty:
-                # Sammenligne faktura mot tilbud
+            # Sammenligne faktura mot tilbud
+            if not invoice_data.empty and not offer_data.empty:
                 with col2:
                     st.write("Sammenligner data...")
-                merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='inner', suffixes=('_Tilbud', '_Faktura'))
+                merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
 
                 # Konverter kolonner til numerisk
                 merged_data["Antall_Faktura"] = pd.to_numeric(merged_data["Antall_Faktura"], errors='coerce')
@@ -175,40 +162,17 @@ def main():
                 merged_data["Avvik_Enhetspris"] = merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]
                 merged_data["Prosentvis_økning"] = ((merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]) / merged_data["Enhetspris_Tilbud"]) * 100
 
+                # Filter avvik
+                avvik = merged_data[(merged_data["Avvik_Antall"].notna() & (merged_data["Avvik_Antall"] != 0)) |
+                                    (merged_data["Avvik_Enhetspris"].notna() & (merged_data["Avvik_Enhetspris"] != 0))]
+
                 with col2:
                     st.subheader("Avvik mellom Faktura og Tilbud")
-                    st.dataframe(merged_data)
+                    st.dataframe(avvik)
 
                 # Artikler som finnes i faktura, men ikke i tilbud
                 unmatched_items = pd.merge(offer_data, invoice_data, on="Varenummer", how="outer", indicator=True)
-                unmatched_items.rename(columns={
-                    'Artikkel': 'Varenummer',  # Artikkel fra faktura, VARENR i tilbudet
-                    'VARENR': 'Varenummer',
-                    'Beskrivelse': 'Beskrivelse_Faktura', 
-                    'Antall': 'Antall_Faktura', 
-                    'Enhet': 'Enhetspris_Faktura',  
-                    'Rab. %': 'Rabatt', 
-                    'Beløp': 'Totalt pris'
-                }, inplace=True)
-
-                required_columns = ["Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris", "Rabatt"]
-
-               # Sjekk hvilke kolonner som finnes i unmatched_items
-                st.write(unmatched_items.columns)
-
-                # Så kan du sjekke om de riktige kolonnene er der
-                required_columns = ["Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris", "Rabatt"]
-
-                # Filtrer kun kolonnene hvis de finnes
-                available_columns = [col for col in required_columns if col in unmatched_items.columns]
-                st.write(f"Tilgjengelige kolonner: {available_columns}")
-
-                # Prøv å filtrere med de kolonnene som finnes
-                only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][available_columns]
-
-                # Vis tabellen
-                st.dataframe(only_in_invoice)
-
+                only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][["Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris", "Rabatt"]]
 
                 with col2:
                     st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
@@ -216,19 +180,19 @@ def main():
 
                 # Lagre kun artikkeldataene til XLSX
                 all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris"]]
-
+                
                 excel_data = convert_df_to_excel(all_items)
 
                 with col3:
                     st.download_button(
                         label="Last ned avviksrapport som Excel",
-                        data=convert_df_to_excel(merged_data),
+                        data=convert_df_to_excel(avvik),
                         file_name="avvik_rapport.xlsx"
                     )
-
+                    
                     st.download_button(
                         label="Last ned alle varenummer som Excel",
-                        data=excel_data,
+                        data=excel_data,  
                         file_name="faktura_varer.xlsx",
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
@@ -242,9 +206,10 @@ def main():
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
             else:
-                st.error("Kunne ikke lese tilbudsdata fra Excel-filen.")
+                st.error("Kunne ikke lese data fra fakturaen eller tilbudet.")
         else:
             st.error("Fakturanummeret ble ikke funnet i PDF-filen.")
 
 if __name__ == "__main__":
     main()
+

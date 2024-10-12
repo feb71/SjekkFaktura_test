@@ -47,7 +47,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                         columns = re.split(r'\s{2,}', line)  # Splitter på store mellomrom (kolonneseparatorer)
                         
                         # Sjekk om linjen inneholder nok kolonner og om første element er et varenummer
-                        if len(columns) >= 6 and columns[0].isdigit():
+                        if len(columns) >= 6 and columns[0].isdigit():  # Sjekk at første kolonne er et nummer
                             item_number = columns[0]  # Nummer = Varenummer
                             description = columns[1]  # Beskrivelse (kan være lang, så vi tar hele kolonnen)
                             
@@ -87,6 +87,10 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
 def compare_invoice_offer(invoice_data, offer_data):
     # Endrer navn på kolonnen "Nummer" i fakturaen til "Varenummer" for å matche tilbudet
     invoice_data.rename(columns={'Nummer': 'Varenummer'}, inplace=True)
+
+    # Feilsøking: Vis kolonnenavnene før sammenslåing
+    st.write("Kolonnenavn i faktura:", invoice_data.columns)
+    st.write("Kolonnenavn i tilbud:", offer_data.columns)
     
     # Merge faktura og tilbud på varenummer
     try:
@@ -162,6 +166,7 @@ def main():
                     df.to_excel(writer, index=False, sheet_name='Sheet1')
                 return output.getvalue()
 
+            # Last ned-knapper for Excel-filer
             st.download_button(
                 label="Last ned avviksrapport som Excel",
                 data=convert_df_to_excel(avvik),

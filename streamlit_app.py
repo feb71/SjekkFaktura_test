@@ -85,27 +85,6 @@ def convert_df_to_excel(df):
 # Hovedfunksjon for Streamlit-appen
 def main():
     st.title("Sammenlign Faktura mot Tilbud")
-    # Justerer tykkelsen på kolonneoverskriftene
-    st.markdown("""
-    <style>
-        .dataframe th {
-            font-weight: bold !important;  /* Gjør kolonneoverskriftene fet */
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Justerer størrelsen, fargen og bakgrunnsfargen på kolonneoverskriftene
-    st.markdown(
-    """
-    <style>
-    .css-1n76uvr thead th {
-        font-size: 36px !important;  /* Justerer skriftstørrelsen */
-        color: #FFFFFF !important;   /* Endrer fargen til hvit */
-        background-color: #333333 !important;  /* Justerer bakgrunnsfargen */
-    }
-    </style>
-    """, 
-    unsafe_allow_html=True)
 
     # Opprett tre kolonner
     col1, col2, col3 = st.columns([1, 5, 1])
@@ -148,12 +127,25 @@ def main():
             # Sammenligne faktura mot tilbud for varenummer
             merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
 
-            # Finne rader hvor varenummeret ikke finnes i tilbudet
-            only_in_invoice = merged_data[merged_data['Varenummer_Tilbud'].isna()]
+            # Finn avvik mellom faktura og tilbud (kun varer som finnes i begge)
+            avvik = merged_data[merged_data['Beskrivelse_Tilbud'].notna() & merged_data['Beskrivelse_Faktura'].notna()]
 
-            # Vise varenummer som finnes i faktura men ikke i tilbud
+            # Finn varer som kun finnes i fakturaen (inkluderer rabatt i denne tabellen)
+            only_in_invoice = merged_data[merged_data['Beskrivelse_Tilbud'].isna()]
+
+            # Finne avvik
+            avvik["Avvik_Antall"] = avvik["Antall_Faktura"] - avvik["Antall_Tilbud"]
+            avvik["Avvik_Enhetspris"] = avvik["Enhetspris_Faktura"] - avvik["Enhetspris_Tilbud"]
+            avvik["Prosentvis_økning"] = ((avvik["Enhetspris_Faktura"] - avvik["Enhetspris_Tilbud"]) / avvik["Enhetspris_Tilbud"]) * 100
+
+            # Vise avvikstabellen (kun varer som finnes i både faktura og tilbud)
             with col2:
-                st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
+                st.subheader("Avvik mellom Faktura og Tilbud")
+                st.dataframe(avvik)
+
+            # Vise varenummer som finnes i faktura men ikke i tilbud (med rabatt inkludert)
+            with col2:
+                st.subheader("Varenummer som finnes i faktura, men ikke i tilbud (med rabatt)")
                 st.dataframe(only_in_invoice)
 
             # Lagre kun artikkeldataene til XLSX
@@ -172,9 +164,9 @@ def main():
                 # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
                 only_in_invoice_data = convert_df_to_excel(only_in_invoice)
                 st.download_button(
-                    label="Last ned varenummer som ikke eksiterer i tilbudet",
+                    label="Last ned varenummer som ikke eksiterer i tilbudet (med rabatt)",
                     data=only_in_invoice_data,
-                    file_name="varer_kun_i_faktura.xlsx",
+                    file_name="varer_kun_i_faktura_med_rabatt.xlsx",
                     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 )
         else:

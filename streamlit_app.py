@@ -95,7 +95,7 @@ def convert_df_to_excel(df):
 def main():
     st.title("Sammenlign Faktura mot Tilbud")
     # Justerer tykkelsen på kolonneoverskriftene
-    st.markdown(""" 
+    st.markdown("""
     <style>
         .dataframe th {
             font-weight: bold !important;  /* Gjør kolonneoverskriftene fet */
@@ -181,15 +181,28 @@ def main():
 
                 # Artikler som finnes i faktura, men ikke i tilbud
                 unmatched_items = pd.merge(offer_data, invoice_data, on="Varenummer", how="outer", indicator=True)
-                only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][["Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris", "Rabatt"]]
-                
+                unmatched_items.rename(columns={
+                    'Artikkel': 'Varenummer',  # Artikkel fra faktura, VARENR i tilbudet
+                    'VARENR': 'Varenummer',
+                    'Beskrivelse': 'Beskrivelse_Faktura', 
+                    'Antall': 'Antall_Faktura', 
+                    'Enhet': 'Enhetspris_Faktura',  
+                    'Rab. %': 'Rabatt', 
+                    'Beløp': 'Totalt pris'
+                }, inplace=True)
+
+                required_columns = ["Varenummer", "Beskrivelse_Faktura
+                ", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris", "Rabatt"]
+
+                only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][required_columns]
+
                 with col2:
                     st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
                     st.dataframe(only_in_invoice)
 
                 # Lagre kun artikkeldataene til XLSX
                 all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris"]]
-                
+
                 excel_data = convert_df_to_excel(all_items)
 
                 with col3:
@@ -198,7 +211,7 @@ def main():
                         data=convert_df_to_excel(merged_data),
                         file_name="avvik_rapport.xlsx"
                     )
-                    
+
                     st.download_button(
                         label="Last ned alle varenummer som Excel",
                         data=excel_data,
@@ -221,4 +234,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

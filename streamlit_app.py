@@ -190,4 +190,40 @@ def main():
                 only_in_invoice = merged_data[merged_data['Enhetspris_Tilbud'].isna()]
                 with col2:
                     st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
-                    st.dataframe(only_in_invoice[["
+                    st.dataframe(only_in_invoice[["Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Rabatt", "Totalt pris"]])
+
+                # Lagre kun artikkeldataene til XLSX
+                all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris"]]
+                
+                excel_data = convert_df_to_excel(all_items)
+
+                with col3:
+                    st.download_button(
+                        label="Last ned avviksrapport som Excel",
+                        data=convert_df_to_excel(avvik),
+                        file_name="avvik_rapport.xlsx"
+                    )
+                    
+                    st.download_button(
+                        label="Last ned alle varenummer som Excel",
+                        data=excel_data,
+                        file_name="faktura_varer.xlsx",
+                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    )
+
+                    # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
+                    only_in_invoice_data = convert_df_to_excel(only_in_invoice[["Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Rabatt", "Totalt pris"]])
+                    st.download_button(
+                        label="Last ned varenummer som ikke eksiterer i tilbudet",
+                        data=only_in_invoice_data,
+                        file_name="varer_kun_i_faktura.xlsx",
+                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    )
+            else:
+                st.error("Kunne ikke lese tilbudsdata fra Excel-filen.")
+        else:
+            st.error("Fakturanummeret ble ikke funnet i PDF-filen.")
+
+if __name__ == "__main__":
+    main()
+

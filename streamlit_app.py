@@ -63,6 +63,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                                 "Beskrivelse_Faktura": description,
                                 "Antall_Faktura": quantity,
                                 "Enhetspris_Faktura": unit_price,
+                                "Rabatt": discount,
                                 "Totalt pris": total_price,
                                 "Type": doc_type
                             })
@@ -170,12 +171,12 @@ def main():
                     st.subheader("Avvik mellom Faktura og Tilbud")
                     st.dataframe(merged_data)
 
-                # Varenummer som finnes i faktura men ikke i tilbud
+                # Varenummer som finnes i faktura men ikke i tilbud, inkludert rabatt
                 unmatched_items = pd.merge(offer_data, invoice_data, on="Varenummer", how='right', suffixes=('_Tilbud', '_Faktura'), indicator=True)
-                only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only']
+                only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][["Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Rabatt", "Totalt pris"]]
                 
                 with col2:
-                    st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
+                    st.subheader("Varenummer som finnes i faktura, men ikke i tilbud (inkludert rabatt)")
                     st.dataframe(only_in_invoice)
 
                 # Lagre Excel-filer
@@ -189,18 +190,18 @@ def main():
                     )
                     
                     st.download_button(
-                        label="Last ned alle varenummer som Excel",
+                                                label="Last ned alle varenummer som Excel",
                         data=excel_data,
                         file_name="faktura_varer.xlsx",
-                                                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
 
-                    # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
+                    # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud (inkludert rabatt)
                     only_in_invoice_data = convert_df_to_excel(only_in_invoice)
                     st.download_button(
-                        label="Last ned varenummer som ikke finnes i tilbudet",
+                        label="Last ned varenummer som ikke finnes i tilbudet (med rabatt)",
                         data=only_in_invoice_data,
-                        file_name="varer_kun_i_faktura.xlsx",
+                        file_name="varer_kun_i_faktura_med_rabatt.xlsx",
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
             else:

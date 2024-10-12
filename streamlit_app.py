@@ -193,7 +193,22 @@ def main():
 
                 required_columns = ["Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris", "Rabatt"]
 
-                only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][required_columns]
+               # Sjekk hvilke kolonner som finnes i unmatched_items
+                st.write(unmatched_items.columns)
+
+                # Så kan du sjekke om de riktige kolonnene er der
+                required_columns = ["Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris", "Rabatt"]
+
+                # Filtrer kun kolonnene hvis de finnes
+                available_columns = [col for col in required_columns if col in unmatched_items.columns]
+                st.write(f"Tilgjengelige kolonner: {available_columns}")
+
+                # Prøv å filtrere med de kolonnene som finnes
+                only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][available_columns]
+
+                # Vis tabellen
+                st.dataframe(only_in_invoice)
+
 
                 with col2:
                     st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")

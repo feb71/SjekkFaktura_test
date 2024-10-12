@@ -2,6 +2,7 @@ import streamlit as st
 import pdfplumber
 import pandas as pd
 from io import BytesIO
+import re  # Legger til import av re-modulen
 
 # Funksjon for å lese fakturanummer fra PDF
 def get_invoice_number(file):

@@ -18,6 +18,14 @@ def get_invoice_number(file):
         st.error(f"Kunne ikke lese fakturanummer fra PDF: {e}")
         return None
 
+# Funksjon for å sjekke om en streng er numerisk
+def is_numeric(value):
+    try:
+        float(value.replace('.', '').replace(',', '.'))
+        return True
+    except ValueError:
+        return False
+
 # Funksjon for å lese tabeller fra PDF-filen
 def extract_data_from_pdf(file, doc_type, invoice_number=None):
     try:
@@ -37,16 +45,19 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                         continue
                     
                     if start_reading:
-                        columns = line.split()
+                        columns = re.split(r'\s{2,}', line)  # Splitter på store mellomrom (kolonneseparatorer)
+                        
                         # Sjekk om linjen inneholder nok kolonner og om første element er et varenummer
                         if len(columns) >= 6 and columns[0].isdigit():
                             item_number = columns[0]  # Nummer = Varenummer
-                            description = " ".join(columns[1:-5])  # Beskrivelse
+                            description = columns[1]  # Beskrivelse (kan være lang, så vi tar hele kolonnen)
                             
+                            # Kolonnene skal inneholde Antall, Enhet, Pris, Beløp
                             try:
-                                quantity = float(columns[-5].replace(',', '.'))  # Antall
-                                unit_price = float(columns[-2].replace('.', '').replace(',', '.'))  # Enhetspris
-                                total_price = float(columns[-1].replace('.', '').replace(',', '.'))  # Beløp
+                                quantity = float(columns[3].replace(',', '.')) if is_numeric(columns[3]) else None  # Antall
+                                unit = columns[4]  # Enhet er tekst, for eksempel "NAR"
+                                unit_price = float(columns[5].replace('.', '').replace(',', '.')) if is_numeric(columns[5]) else None  # Enhetspris
+                                total_price = float(columns[6].replace('.', '').replace(',', '.')) if is_numeric(columns[6]) else None  # Beløp
                             except ValueError as e:
                                 st.error(f"Kunne ikke konvertere til flyttall: {e}")
                                 continue
@@ -58,6 +69,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                                 "Varenummer": item_number,
                                 "Beskrivelse_Faktura": description,
                                 "Antall_Faktura": quantity,
+                                "Enhet_Faktura": unit,  # Enhet er tekst
                                 "Enhetspris_Faktura": unit_price,
                                 "Totalt pris": total_price,
                                 "Type": doc_type

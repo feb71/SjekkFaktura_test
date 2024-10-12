@@ -1,3 +1,8 @@
+import streamlit as st
+import pdfplumber
+import pandas as pd
+from io import BytesIO
+
 # Funksjon for å lese PDF-filen og hente ut relevante data
 def extract_data_from_pdf(file, doc_type, invoice_number=None):
     try:

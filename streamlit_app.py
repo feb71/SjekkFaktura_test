@@ -40,6 +40,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
 
                     if start_reading:
                         columns = line.split()
+                        # Denne linjen må ha minst 8 kolonner, og vi fokuserer på nummer, beskrivelse, pris, antall, og beløp
                         if len(columns) >= 8:
                             item_number = columns[0]  # Nummer = Varenummer
                             if not item_number.isdigit():

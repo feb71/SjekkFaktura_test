@@ -86,6 +86,32 @@ def split_description(data, doc_type):
     
     return data
 
+# Funksjon for å sammenligne avvik mellom faktura og tilbud
+def generate_avvikstabell(offer_data, invoice_data):
+    merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how="inner", suffixes=('_Tilbud', '_Faktura'))
+
+    # Konverter kolonner til numerisk
+    merged_data["Antall_Faktura"] = pd.to_numeric(merged_data["Antall_Faktura"], errors='coerce')
+    merged_data["Antall_Tilbud"] = pd.to_numeric(merged_data["Antall_Tilbud"], errors='coerce')
+    merged_data["Enhetspris_Faktura"] = pd.to_numeric(merged_data["Enhetspris_Faktura"], errors='coerce')
+    merged_data["Enhetspris_Tilbud"] = pd.to_numeric(merged_data["Enhetspris_Tilbud"], errors='coerce')
+
+    # Finne avvik
+    merged_data["Avvik_Antall"] = merged_data["Antall_Faktura"] - merged_data["Antall_Tilbud"]
+    merged_data["Avvik_Enhetspris"] = merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]
+    merged_data["Prosentvis_økning"] = ((merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]) / merged_data["Enhetspris_Tilbud"]) * 100
+    
+    return merged_data
+
+# Funksjon for å generere tabell med varenummer kun i faktura
+def generate_varenummer_faktura(offer_data, invoice_data):
+    unmatched_items = pd.merge(offer_data, invoice_data, on="Varenummer", how="outer", indicator=True)
+    only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][[
+        "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Rabatt", "Totalt pris"
+    ]]
+    
+    return only_in_invoice
+
 # Funksjon for å konvertere DataFrame til en Excel-fil
 def convert_df_to_excel(df):
     output = BytesIO()
@@ -96,28 +122,7 @@ def convert_df_to_excel(df):
 # Hovedfunksjon for Streamlit-appen
 def main():
     st.title("Sammenlign Faktura mot Tilbud")
-    # Justerer tykkelsen på kolonneoverskriftene
-    st.markdown("""
-    <style>
-        .dataframe th {
-            font-weight: bold !important;  /* Gjør kolonneoverskriftene fet */
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Justerer størrelsen, fargen og bakgrunnsfargen på kolonneoverskriftene
-    st.markdown(
-    """
-    <style>
-    .css-1n76uvr thead th {
-        font-size: 36px !important;  /* Justerer skriftstørrelsen */
-        color: #FFFFFF !important;   /* Endrer fargen til hvit */
-        background-color: #333333 !important;  /* Justerer bakgrunnsfargen */
-    }
-    </style>
-    """, 
-    unsafe_allow_html=True)
-
+    
     # Opprett tre kolonner
     col1, col2, col3 = st.columns([1, 5, 1])
 
@@ -161,45 +166,17 @@ def main():
                 invoice_data = split_description(invoice_data, "Faktura")
 
             if not offer_data.empty:
-                # Sammenligne faktura mot tilbud
-                with col2:
-                    st.write("Sammenligner data...")
-                merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
-
-                # Fyll ut "Rabatt" for varer som finnes i både tilbud og faktura (null for tilbudet)
-                merged_data["Rabatt_Tilbud"] = merged_data.apply(lambda row: 0 if pd.notna(row["Varenummer"]) else row["Rabatt"], axis=1)
-
-                # Konverter kolonner til numerisk
-                merged_data["Antall_Faktura"] = pd.to_numeric(merged_data["Antall_Faktura"], errors='coerce')
-                merged_data["Antall_Tilbud"] = pd.to_numeric(merged_data["Antall_Tilbud"], errors='coerce')
-                merged_data["Enhetspris_Faktura"] = pd.to_numeric(merged_data["Enhetspris_Faktura"], errors='coerce')
-                merged_data["Enhetspris_Tilbud"] = pd.to_numeric(merged_data["Enhetspris_Tilbud"], errors='coerce')
-
-                # Finne avvik
-                merged_data["Avvik_Antall"] = merged_data["Antall_Faktura"] - merged_data["Antall_Tilbud"]
-                merged_data["Avvik_Enhetspris"] = merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]
-                merged_data["Prosentvis_økning"] = ((merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]) / merged_data["Enhetspris_Tilbud"]) * 100
-
+                # Generer avvikstabellen
+                avvik_data = generate_avvikstabell(offer_data, invoice_data)
                 with col2:
                     st.subheader("Avvik mellom Faktura og Tilbud")
-                    st.dataframe(merged_data[[
-                        "Varenummer", "Beskrivelse_Tilbud", "Beskrivelse_Faktura", 
-                        "Antall_Tilbud", "Antall_Faktura", "Enhetspris_Tilbud", 
-                        "Enhetspris_Faktura", "Rabatt_Tilbud", "Rabatt", 
-                        "Totalt pris_Tilbud", "Totalt pris_Faktura", 
-                        "Avvik_Antall", "Avvik_Enhetspris", "Prosentvis_økning"
-                    ]])
+                    st.dataframe(avvik_data)
 
-                # Artikler som finnes i faktura, men ikke i tilbud
-                unmatched_items = pd.merge(offer_data, invoice_data, on="Varenummer", how="outer", indicator=True)
-                only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][[
-                    "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", 
-                    "Enhetspris_Faktura", "Rabatt", "Totalt pris"
-                ]]
-                
+                # Generer tabell med varenummer kun i faktura
+                only_in_invoice_data = generate_varenummer_faktura(offer_data, invoice_data)
                 with col2:
                     st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
-                    st.dataframe(only_in_invoice)
+                    st.dataframe(only_in_invoice_data)
 
                 # Lagre kun artikkeldataene til XLSX
                 all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris"]]
@@ -209,7 +186,7 @@ def main():
                 with col3:
                     st.download_button(
                         label="Last ned avviksrapport som Excel",
-                        data=convert_df_to_excel(merged_data),
+                        data=convert_df_to_excel(avvik_data),
                         file_name="avvik_rapport.xlsx"
                     )
                     
@@ -221,10 +198,10 @@ def main():
                     )
 
                     # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
-                    only_in_invoice_data = convert_df_to_excel(only_in_invoice)
+                    only_in_invoice_excel_data = convert_df_to_excel(only_in_invoice_data)
                     st.download_button(
                         label="Last ned varenummer som ikke eksisterer i tilbudet",
-                        data=only_in_invoice_data,
+                        data=only_in_invoice_excel_data,
                         file_name="varer_kun_i_faktura.xlsx",
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )

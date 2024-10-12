@@ -75,17 +75,6 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
 
-# Funksjon for å dele opp beskrivelsen basert på siste elementer
-def split_description(data, doc_type):
-    if doc_type == "Faktura":
-        data['Enhet_Faktura'] = data['Beskrivelse_Faktura'].str.extract(r'(\bM2|\bM|\bSTK)$', expand=False)
-        data['Beskrivelse_Faktura'] = data['Beskrivelse_Faktura'].str.replace(r'\s*\b(M2|M|STK)$', '', regex=True)
-
-        data['Antall_Faktura'] = data['Beskrivelse_Faktura'].str.extract(r'(\d+)$', expand=False).astype(float)
-        data['Beskrivelse_Faktura'] = data['Beskrivelse_Faktura'].str.replace(r'\s*\d+$', '', regex=True)
-    
-    return data
-
 # Funksjon for å konvertere DataFrame til en Excel-fil
 def convert_df_to_excel(df):
     output = BytesIO()
@@ -156,69 +145,40 @@ def main():
                 'TOTALPRIS': 'Totalt pris'
             }, inplace=True)
 
-            # Del opp beskrivelsen fra fakturaen
-            if not invoice_data.empty:
-                invoice_data = split_description(invoice_data, "Faktura")
+            # Sammenligne faktura mot tilbud for varenummer
+            merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
 
-            if not offer_data.empty:
-                # Sammenligne faktura mot tilbud
-                with col2:
-                    st.write("Sammenligner data...")
-                merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
+            # Finne rader hvor varenummeret ikke finnes i tilbudet
+            only_in_invoice = merged_data[merged_data['Varenummer_Tilbud'].isna()]
 
-                # Konverter kolonner til numerisk
-                merged_data["Antall_Faktura"] = pd.to_numeric(merged_data["Antall_Faktura"], errors='coerce')
-                merged_data["Antall_Tilbud"] = pd.to_numeric(merged_data["Antall_Tilbud"], errors='coerce')
-                merged_data["Enhetspris_Faktura"] = pd.to_numeric(merged_data["Enhetspris_Faktura"], errors='coerce')
-                merged_data["Enhetspris_Tilbud"] = pd.to_numeric(merged_data["Enhetspris_Tilbud"], errors='coerce')
+            # Vise varenummer som finnes i faktura men ikke i tilbud
+            with col2:
+                st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
+                st.dataframe(only_in_invoice)
 
-                # Finne avvik (inkluderer rader med avvik = 0)
-                merged_data["Avvik_Antall"] = merged_data["Antall_Faktura"] - merged_data["Antall_Tilbud"]
-                merged_data["Avvik_Enhetspris"] = merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]
-                merged_data["Prosentvis_økning"] = ((merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]) / merged_data["Enhetspris_Tilbud"]) * 100
+            # Lagre kun artikkeldataene til XLSX
+            all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Rabatt_Faktura", "Totalt pris"]]
+            
+            excel_data = convert_df_to_excel(all_items)
 
-                with col2:
-                    st.subheader("Avvik mellom Faktura og Tilbud (inkludert null-avvik)")
-                    st.dataframe(merged_data)  # Viser hele sammenligningen inkludert rader med 0 avvik
+            with col3:
+                st.download_button(
+                    label="Last ned alle varenummer som Excel",
+                    data=excel_data,
+                    file_name="faktura_varer.xlsx",
+                    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                )
 
-                                # Artikler som finnes i faktura, men ikke i tilbud
-                only_in_invoice = merged_data[merged_data['Enhetspris_Tilbud'].isna()]
-                with col2:
-                    st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
-                    st.dataframe(only_in_invoice)
-
-                # Lagre kun artikkeldataene til XLSX
-                all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Rabatt_Faktura", "Totalt pris"]]
-                
-                excel_data = convert_df_to_excel(all_items)
-
-                with col3:
-                    st.download_button(
-                        label="Last ned avviksrapport som Excel",
-                        data=convert_df_to_excel(merged_data),  # Nedlasting av hele sammenligningen
-                        file_name="avvik_rapport.xlsx"
-                    )
-                    
-                    st.download_button(
-                        label="Last ned alle varenummer som Excel",
-                        data=excel_data,
-                        file_name="faktura_varer.xlsx",
-                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                    )
-
-                    # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
-                    only_in_invoice_data = convert_df_to_excel(only_in_invoice)
-                    st.download_button(
-                        label="Last ned varenummer som ikke eksiterer i tilbudet",
-                        data=only_in_invoice_data,
-                        file_name="varer_kun_i_faktura.xlsx",
-                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                    )
-            else:
-                st.error("Kunne ikke lese tilbudsdata fra Excel-filen.")
+                # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
+                only_in_invoice_data = convert_df_to_excel(only_in_invoice)
+                st.download_button(
+                    label="Last ned varenummer som ikke eksiterer i tilbudet",
+                    data=only_in_invoice_data,
+                    file_name="varer_kun_i_faktura.xlsx",
+                    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                )
         else:
             st.error("Fakturanummeret ble ikke funnet i PDF-filen.")
 
 if __name__ == "__main__":
     main()
-

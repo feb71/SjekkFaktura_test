@@ -50,7 +50,6 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                             try:
                                 quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else columns[-4]
                                 unit_price = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else columns[-3]
-                                discount = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else columns[-2]
                                 total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else columns[-1]
                             except ValueError as e:
                                 st.error(f"Kunne ikke konvertere til flyttall: {e}")
@@ -63,7 +62,6 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                                 "Beskrivelse_Faktura": description,
                                 "Antall_Faktura": quantity,
                                 "Enhetspris_Faktura": unit_price,
-                                "Rabatt_Faktura": discount,
                                 "Totalt pris": total_price,
                                 "Type": doc_type
                             })
@@ -168,7 +166,7 @@ def main():
                     st.dataframe(only_in_invoice)
 
                 # Lagre kun artikkeldataene til XLSX
-                all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Rabatt_Faktura", "Totalt pris"]]
+                all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris"]]
                 
                 excel_data = convert_df_to_excel(all_items)
 
@@ -182,20 +180,18 @@ def main():
                     st.download_button(
                         label="Last ned alle varenummer som Excel",
                         data=excel_data,
-                        file_name="faktura_varer.xlsx",
+                                                file_name="faktura_varer.xlsx",
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
 
-                  
-                     # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
+                    # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
                     only_in_invoice_data = convert_df_to_excel(only_in_invoice)
                     st.download_button(
-                        label="Last ned varenummer som ikke eksisterer i tilbudet",
+                        label="Last ned varenummer som ikke finnes i tilbudet",
                         data=only_in_invoice_data,
                         file_name="varer_kun_i_faktura.xlsx",
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
-
             else:
                 st.error("Kunne ikke lese tilbudsdata fra Excel-filen.")
         else:

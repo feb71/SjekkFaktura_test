@@ -39,7 +39,6 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                 
                 # Finne startpunkt for innlesning ved å identifisere kolonneoverskrifter
                 for line in lines:
-                    # Vi ser etter linjen med kolonneoverskriftene: "Nummer", "Beskrivelse", "Antall", "Enhet", "Pris", "Beløp"
                     if "Nummer" in line and "Beskrivelse" in line:
                         start_reading = True
                         continue
@@ -86,10 +85,9 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
 
 # Funksjon for å sammenligne faktura med tilbud
 def compare_invoice_offer(invoice_data, offer_data):
-    # Debugging: Skriv ut kolonnenavnene fra faktura og tilbud
-    st.write("Kolonner fra fakturaen:", invoice_data.columns)
-    st.write("Kolonner fra tilbudet:", offer_data.columns)
-
+    # Endrer navn på kolonnen "Nummer" i fakturaen til "Varenummer" for å matche tilbudet
+    invoice_data.rename(columns={'Nummer': 'Varenummer'}, inplace=True)
+    
     # Merge faktura og tilbud på varenummer
     try:
         merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))

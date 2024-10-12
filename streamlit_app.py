@@ -66,7 +66,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                             unique_id = f"{invoice_number}_{item_number}" if invoice_number else item_number
                             data.append({
                                 "UnikID": unique_id,
-                                "Varenummer": item_number,
+                                "Varenummer": item_number,  # Bruk "Varenummer" her for sammenslåing
                                 "Beskrivelse_Faktura": description,
                                 "Antall_Faktura": quantity,
                                 "Enhet_Faktura": unit,  # Enhet er tekst
@@ -86,6 +86,10 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
 
 # Funksjon for å sammenligne faktura med tilbud
 def compare_invoice_offer(invoice_data, offer_data):
+    # Debugging: Skriv ut kolonnenavnene fra faktura og tilbud
+    st.write("Kolonner fra fakturaen:", invoice_data.columns)
+    st.write("Kolonner fra tilbudet:", offer_data.columns)
+
     # Merge faktura og tilbud på varenummer
     try:
         merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
@@ -134,7 +138,7 @@ def main():
             # Les tilbudsdata
             offer_data = pd.read_excel(offer_file)
             offer_data.rename(columns={
-                'VARENR': 'Varenummer',
+                'VARENR': 'Varenummer',  # Endrer VARENR til Varenummer for å matche fakturaen
                 'BESKRIVELSE': 'Beskrivelse_Tilbud',
                 'ANTALL': 'Antall_Tilbud',
                 'ENHET': 'Enhet_Tilbud',

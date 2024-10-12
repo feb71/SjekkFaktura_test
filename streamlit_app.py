@@ -191,8 +191,7 @@ def main():
                     'Beløp': 'Totalt pris'
                 }, inplace=True)
 
-                required_columns = ["Varenummer", "Beskrivelse_Faktura
-                ", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris", "Rabatt"]
+                required_columns = ["Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris", "Rabatt"]
 
                 only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][required_columns]
 

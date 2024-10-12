@@ -172,19 +172,16 @@ def main():
                 merged_data["Enhetspris_Faktura"] = pd.to_numeric(merged_data["Enhetspris_Faktura"], errors='coerce')
                 merged_data["Enhetspris_Tilbud"] = pd.to_numeric(merged_data["Enhetspris_Tilbud"], errors='coerce')
 
-                # Finne avvik
+                # Finne avvik (inkluderer rader med avvik = 0)
                 merged_data["Avvik_Antall"] = merged_data["Antall_Faktura"] - merged_data["Antall_Tilbud"]
                 merged_data["Avvik_Enhetspris"] = merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]
                 merged_data["Prosentvis_økning"] = ((merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]) / merged_data["Enhetspris_Tilbud"]) * 100
 
-                avvik = merged_data[(merged_data["Avvik_Antall"].notna() & (merged_data["Avvik_Antall"] != 0)) |
-                                    (merged_data["Avvik_Enhetspris"].notna() & (merged_data["Avvik_Enhetspris"] != 0))]
-
                 with col2:
-                    st.subheader("Avvik mellom Faktura og Tilbud")
-                    st.dataframe(avvik)
+                    st.subheader("Avvik mellom Faktura og Tilbud (inkludert null-avvik)")
+                    st.dataframe(merged_data)  # Viser hele sammenligningen inkludert rader med 0 avvik
 
-                # Artikler som finnes i faktura, men ikke i tilbud
+                                # Artikler som finnes i faktura, men ikke i tilbud
                 only_in_invoice = merged_data[merged_data['Enhetspris_Tilbud'].isna()]
                 with col2:
                     st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
@@ -198,7 +195,7 @@ def main():
                 with col3:
                     st.download_button(
                         label="Last ned avviksrapport som Excel",
-                        data=convert_df_to_excel(avvik),
+                        data=convert_df_to_excel(merged_data),  # Nedlasting av hele sammenligningen
                         file_name="avvik_rapport.xlsx"
                     )
                     

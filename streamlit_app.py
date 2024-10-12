@@ -2,7 +2,7 @@ import streamlit as st
 import pdfplumber
 import pandas as pd
 from io import BytesIO
-import re  # Legger til import av re-modulen
+import re
 
 # Funksjon for å lese fakturanummer fra PDF
 def get_invoice_number(file):
@@ -18,7 +18,7 @@ def get_invoice_number(file):
         st.error(f"Kunne ikke lese fakturanummer fra PDF: {e}")
         return None
 
-# Funksjon for å lese PDF-filen og hente ut relevante data
+# Funksjon for å lese tabeller fra PDF-filen
 def extract_data_from_pdf(file, doc_type, invoice_number=None):
     try:
         with pdfplumber.open(file) as pdf:
@@ -26,51 +26,46 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
             start_reading = False
 
             for page in pdf.pages:
-                text = page.extract_text()
-                if text is None:
-                    st.error(f"Ingen tekst funnet på side {page.page_number} i PDF-filen.")
+                # Ekstraher tabeller fra PDF-siden
+                tables = page.extract_table()
+                if not tables:
+                    st.error(f"Ingen tabeller funnet på side {page.page_number} i PDF-filen.")
                     continue
-                
-                lines = text.split('\n')
-                for line in lines:
-                    # Sjekk etter kolonneoverskriftene vi er ute etter: "Nummer", "Bransjenr.", "Beskrivelse", "MVA%", "Antall", "Enhet", "Pris", "Beløp"
-                    if doc_type == "Faktura" and "Nummer" in line and "Bransjenr." in line:
-                        start_reading = True
-                        continue
 
-                    if start_reading:
-                        columns = line.split()
-                        # Denne linjen må ha minst 8 kolonner, og vi fokuserer på nummer, beskrivelse, pris, antall, og beløp
-                        if len(columns) >= 8:
-                            item_number = columns[0]  # Nummer = Varenummer
-                            if not item_number.isdigit():
-                                continue
+                # Hver rad i tabellen
+                for row in tables:
+                    # Vi sjekker først om det er riktig rad, det må være minst 8 kolonner
+                    if len(row) >= 8:
+                        item_number = row[0]  # Nummer = Varenummer
+                        if not item_number.isdigit():
+                            continue
+                        description = row[2]  # Beskrivelse
 
-                            description = " ".join(columns[2:-5])  # Kombiner beskrivelsen
-                            try:
-                                # Pris = Enhetspris, Beløp = Totalt pris, og antall kan beregnes
-                                total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else None
-                                unit_price = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else None
-                                
-                                # Antall kan beregnes ved å dele beløp på pris
-                                if total_price and unit_price:
-                                    quantity = total_price / unit_price
-                                else:
-                                    quantity = None
-                            except ValueError as e:
-                                st.error(f"Kunne ikke konvertere til flyttall: {e}")
-                                continue
+                        try:
+                            # Pris = Enhetspris, Beløp = Totalt pris, og antall kan beregnes
+                            total_price = float(row[-1].replace('.', '').replace(',', '.')) if row[-1] else None
+                            unit_price = float(row[-3].replace('.', '').replace(',', '.')) if row[-3] else None
 
-                            unique_id = f"{invoice_number}_{item_number}" if invoice_number else item_number
-                            data.append({
-                                "UnikID": unique_id,
-                                "Varenummer": item_number,
-                                "Beskrivelse_Faktura": description,
-                                "Antall_Faktura": quantity,
-                                "Enhetspris_Faktura": unit_price,
-                                "Totalt pris": total_price,
-                                "Type": doc_type
-                            })
+                            # Antall kan beregnes ved å dele beløp på pris
+                            if total_price and unit_price:
+                                quantity = total_price / unit_price
+                            else:
+                                quantity = None
+                        except ValueError as e:
+                            st.error(f"Kunne ikke konvertere til flyttall: {e}")
+                            continue
+
+                        unique_id = f"{invoice_number}_{item_number}" if invoice_number else item_number
+                        data.append({
+                            "UnikID": unique_id,
+                            "Varenummer": item_number,
+                            "Beskrivelse_Faktura": description,
+                            "Antall_Faktura": quantity,
+                            "Enhetspris_Faktura": unit_price,
+                            "Totalt pris": total_price,
+                            "Type": doc_type
+                        })
+
             if len(data) == 0:
                 st.error("Ingen data ble funnet i PDF-filen.")
                 

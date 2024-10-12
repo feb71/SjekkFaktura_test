@@ -48,7 +48,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
 
                             description = " ".join(columns[2:-4])  # Oppdater til -4 for å ekskludere rabatt
                             try:
-                                quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else columns[-4]
+                                quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').replace('M', '').replace('STK', '').isdigit() else columns[-4]
                                 discount = float(columns[-3].replace(',', '.'))  # Rabatt kolonne
                                 unit_price = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else columns[-2]
                                 total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else columns[-1]
@@ -74,6 +74,14 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
     except Exception as e:
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
+
+# Funksjon for å håndtere enheter som "M" og "STK" riktig
+def split_description(data, doc_type):
+    if doc_type == "Faktura":
+        data['Enhet_Faktura'] = data['Beskrivelse_Faktura'].str.extract(r'(\bM2|\bM|\bSTK)$', expand=False)
+        data['Beskrivelse_Faktura'] = data['Beskrivelse_Faktura'].str.replace(r'\s*\b(M2|M|STK)$', '', regex=True)
+
+    return data
 
 
 # Funksjon for å dele opp beskrivelsen basert på siste elementer

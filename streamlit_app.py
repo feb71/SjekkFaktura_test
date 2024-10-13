@@ -173,7 +173,11 @@ def main():
                 # Fyll ut verdien for Rabatt som 0 der det ikke finnes
                 merged_data["Rabatt"] = merged_data["Rabatt"].fillna(0)
 
-                # Finne avvik
+                # Før vi refererer til 'Rabatt', sjekker vi om kolonnen eksisterer, og hvis ikke, oppretter vi den med en standardverdi.
+                if 'Rabatt' not in merged_data.columns:
+                    merged_data['Rabatt'] = 0  # Bruker 0 som standardverdi for rabatt
+
+                # Deretter fortsetter vi med resten av koden for å finne avvik og vise data
                 merged_data["Avvik_Antall"] = merged_data["Antall_Faktura"] - merged_data["Antall_Tilbud"]
                 merged_data["Avvik_Enhetspris"] = merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]
                 merged_data["Prosentvis_økning"] = ((merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]) / merged_data["Enhetspris_Tilbud"]) * 100

@@ -177,7 +177,14 @@ def main():
                 merged_data["Prosentvis_økning"] = ((merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]) / merged_data["Enhetspris_Tilbud"]) * 100
 
                 # Hvis ingen rabatt, sett til None i avvikstabellen
-                merged_data["Rabatt"] = merged_data["Rabatt"].fillna(value=None)
+                # Sjekk først om kolonnen 'Rabatt' eksisterer før vi prøver å fylle den
+                if 'Rabatt' in merged_data.columns:
+                    merged_data['Rabatt'] = merged_data['Rabatt'].fillna(value=None)
+                else:
+                    # Hvis kolonnen ikke finnes, opprett den og sett den til None
+                    merged_data['Rabatt'] = None
+
+                
 
                 avvik = merged_data[(merged_data["Avvik_Antall"].notna() & (merged_data["Avvik_Antall"] != 0)) |
                                     (merged_data["Avvik_Enhetspris"].notna() & (merged_data["Avvik_Enhetspris"] != 0))]

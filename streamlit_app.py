@@ -20,6 +20,7 @@ def get_invoice_number(file):
         st.error(f"Kunne ikke lese fakturanummer fra PDF: {e}")
         return None
 
+
 # Funksjon for å lese PDF-filen og hente ut relevante data inkludert enhet, rabatt, og pris
 def extract_data_from_pdf(file, doc_type, invoice_number=None):
     try:
@@ -87,6 +88,9 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
     except Exception as e:
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
+
+# Resten av koden bør forbli den samme.
+
 
 # Resten av koden bør forbli den samme.
 

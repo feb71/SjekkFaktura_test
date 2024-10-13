@@ -69,7 +69,12 @@ def extract_data_from_invoice(file, doc_type, invoice_number=None):
                                 "Faktura_Beløp": total_price,
                                 "Type": doc_type
                             })
-            return pd.DataFrame(data)
+            df = pd.DataFrame(data)
+
+            # Sikre at "Rabatt" kolonnen har None der det mangler rabatt
+            df["Rabatt"] = df["Rabatt"].fillna(None)
+
+            return df
     except Exception as e:
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()

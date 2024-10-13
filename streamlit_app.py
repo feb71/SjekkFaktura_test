@@ -46,10 +46,11 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                             if not item_number.isdigit():
                                 continue
 
-                            # Trekke ut beskrivelse, og antall hvis det finnes på slutten av beskrivelsen
-                            description = " ".join(columns[2:-4])
+                            # Beskrivelse og enhet
+                            description = " ".join(columns[2:-5])
+                            unit = columns[-5]  # Enhet er plassert rett før priskolonnene
+
                             try:
-                                # Hvis antall er inkludert i beskrivelsen (for varer kun i faktura)
                                 antall_fra_beskrivelse = re.search(r'(\d+)\s*$', description)
                                 if antall_fra_beskrivelse:
                                     quantity = float(antall_fra_beskrivelse.group(1).replace('.', '').replace(',', '.'))
@@ -70,6 +71,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                                 "Varenummer": item_number,
                                 "Beskrivelse_Faktura": description,
                                 "Antall_Faktura": quantity,
+                                "Enhet_Faktura": unit,  # Inkluder enhet
                                 "Enhetspris_Faktura": unit_price,
                                 "Rabatt": discount,
                                 "Beløp_Faktura": total_price,

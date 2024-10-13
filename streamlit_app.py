@@ -20,7 +20,6 @@ def get_invoice_number(file):
         st.error(f"Kunne ikke lese fakturanummer fra PDF: {e}")
         return None
 
-# Funksjon for å lese PDF-filen og hente ut relevante data
 def extract_data_from_pdf(file, doc_type, invoice_number=None):
     try:
         with pdfplumber.open(file) as pdf:
@@ -51,10 +50,11 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                             unit = columns[-5]  # Enhet er plassert rett før priskolonnene
 
                             try:
+                                # Hent ut antall fra beskrivelsen hvis det er plassert der, ellers bruk standardplassering
                                 antall_fra_beskrivelse = re.search(r'(\d+)\s*$', description)
                                 if antall_fra_beskrivelse:
                                     quantity = float(antall_fra_beskrivelse.group(1).replace('.', '').replace(',', '.'))
-                                    description = re.sub(r'\s*\d+\s*$', '', description)
+                                    description = re.sub(r'\s*\d+\s*$', '', description)  # Fjern antallet fra beskrivelsen
                                 else:
                                     quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else columns[-4]
                                 

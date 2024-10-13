@@ -20,6 +20,7 @@ def get_invoice_number(file):
         st.error(f"Kunne ikke lese fakturanummer fra PDF: {e}")
         return None
 
+# Funksjon for å lese PDF-filen og hente ut relevante data
 def extract_data_from_pdf(file, doc_type, invoice_number=None):
     try:
         with pdfplumber.open(file) as pdf:
@@ -40,7 +41,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
 
                     if start_reading:
                         columns = line.split()
-                        if len(columns) >= 6:  # Passer på at vi har nok kolonner for rabatt, enhetspris, etc.
+                        if len(columns) >= 5:
                             item_number = columns[1]
                             if not item_number.isdigit():
                                 continue
@@ -49,7 +50,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                             try:
                                 quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else columns[-4]
                                 unit_price = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else columns[-3]
-                                discount = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else 0
+                                discount = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else 0  # Her setter vi rabatt til 0 hvis den ikke finnes
                                 total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else columns[-1]
                             except ValueError as e:
                                 st.error(f"Kunne ikke konvertere til flyttall: {e}")
@@ -62,7 +63,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                                 "Beskrivelse_Faktura": description,
                                 "Antall_Faktura": quantity,
                                 "Enhetspris_Faktura": unit_price,
-                                "Rabatt": discount,
+                                "Rabatt": discount,  # Rabatt verdien settes her
                                 "Totalt pris": total_price,
                                 "Type": doc_type
                             })
@@ -73,6 +74,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
     except Exception as e:
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
+
 
 # Funksjon for å dele opp beskrivelsen basert på siste elementer
 def split_description(data, doc_type):

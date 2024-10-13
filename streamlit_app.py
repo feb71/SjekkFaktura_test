@@ -62,7 +62,7 @@ def extract_data_for_avvik(file, doc_type, invoice_number=None):
                                 "Faktura_Beskrivelse": description,
                                 "Faktura_Antall": quantity,
                                 "Faktura_Enhetspris": unit_price,
-                                "Faktura_Totalt_pris": total_price,
+                                "Faktura_Beløp": total_price,  # Endret til Faktura_Beløp
                                 "Type": doc_type
                             })
             return pd.DataFrame(data)
@@ -114,7 +114,7 @@ def extract_data_with_rabatt(file, doc_type, invoice_number=None):
                                 "Faktura_Antall": quantity,
                                 "Rabatt": discount,
                                 "Faktura_Enhetspris": unit_price,
-                                "Faktura_Totalt_pris": total_price,
+                                "Faktura_Beløp": total_price,  # Endret til Faktura_Beløp
                                 "Type": doc_type
                             })
             return pd.DataFrame(data)
@@ -173,7 +173,7 @@ def main():
 
             # Artikler som finnes i faktura, men ikke i tilbud (med rabatt)
             unmatched_items = pd.merge(offer_data, invoice_data_rabatt, on="Varenummer", how="outer", indicator=True)
-            only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][["Varenummer", "Faktura_Beskrivelse", "Faktura_Antall", "Faktura_Enhetspris", "Faktura_Totalt_pris", "Rabatt"]]
+            only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][["Varenummer", "Faktura_Beskrivelse", "Faktura_Antall", "Faktura_Enhetspris", "Faktura_Beløp", "Rabatt"]]
             
             st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
             st.dataframe(only_in_invoice)

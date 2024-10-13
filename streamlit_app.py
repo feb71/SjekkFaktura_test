@@ -71,7 +71,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                                 "Enhet_Faktura": unit if unit else None,  # Enhet kolonne som tekst
                                 "Enhetspris_Faktura": unit_price if unit_price else None,
                                 "Rabatt": discount if discount else 0,  # Rabatt kolonne
-                                "Totalt pris": total_price if total_price else None,
+                                "Totalt_pris_Faktura": total_price if total_price else None,  # Merk riktig kolonnenavn
                                 "Type": doc_type
                             })
             if len(data) == 0:
@@ -82,14 +82,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
 
-
-
-
-
-
-
-
-
+# Resten av koden bør forbli den samme.
 # Funksjon for å konvertere DataFrame til en Excel-fil
 def convert_df_to_excel(df):
     output = BytesIO()

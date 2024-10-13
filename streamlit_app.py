@@ -194,11 +194,20 @@ def main():
                     st.subheader("Avvik mellom Faktura og Tilbud")
                     st.dataframe(avvik)
 
-                # Artikler som finnes i faktura, men ikke i tilbud
+                   # Artikler som finnes i faktura, men ikke i tilbud
                 only_in_invoice = merged_data[merged_data['Enhetspris_Tilbud'].isna()]
+
+                # Fyll ut manglende verdier i Rabatt som None
+                only_in_invoice['Rabatt'] = only_in_invoice['Rabatt'].fillna(value=pd.NA)
+
+                # Juster kolonneoppdateringen for riktig plassering av enhetspris og rabatt
+                only_in_invoice = only_in_invoice[['Varenummer', 'Beskrivelse_Faktura', 'Antall_Faktura', 'Enhetspris_Faktura', 'Totalt pris_Faktura', 'Rabatt', 'Type']]
+
+                # Vis tabellen med korrekt justerte verdier
                 with col2:
                     st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
                     st.dataframe(only_in_invoice)
+
 
                 # Lagre kun artikkeldataene til XLSX
                 all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris", "Rabatt"]]

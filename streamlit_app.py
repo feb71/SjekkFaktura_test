@@ -84,13 +84,27 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
 
+# Kombiner tabellene til en for nedlasting
+combined_data = pd.concat([merged_data, only_in_invoice])
 
 # Funksjon for å konvertere DataFrame til en Excel-fil
-def convert_df_to_excel(df):
+def convert_combined_df_to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Sheet1')
+        df.to_excel(writer, index=False, sheet_name='Faktura_og_Tilbud')
     return output.getvalue()
+
+# Opprett nedlastingsknappen for den kombinerte tabellen
+with col3:
+    st.download_button(
+        label="Last ned alle data som én Excel-fil",
+        data=convert_combined_df_to_excel(combined_data),
+        file_name="faktura_og_tilbud.xlsx",
+        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+
+
 
 # Hovedfunksjon for Streamlit-appen
 def main():

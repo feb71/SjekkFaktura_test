@@ -85,10 +85,12 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
 
 
 # Funksjon for å konvertere DataFrame til en Excel-fil
-def convert_df_to_excel(df):
+def convert_combined_df_to_excel(avvik, only_in_invoice):
+    combined_data = pd.concat([avvik, only_in_invoice], ignore_index=True)
+    
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Sheet1')
+        combined_data.to_excel(writer, index=False, sheet_name='Sammenslått Data')
     return output.getvalue()
 
 # Hovedfunksjon for Streamlit-appen
@@ -148,19 +150,6 @@ def main():
                 merged_data["Enhetspris_Faktura"] = pd.to_numeric(merged_data["Enhetspris_Faktura"], errors='coerce')
                 merged_data["Enhetspris_Tilbud"] = pd.to_numeric(merged_data["Enhetspris_Tilbud"], errors='coerce')
 
-                # Etter at vi har samlet dataene og opprettet merged_data, kan vi legge til en sjekk for å flytte verdiene
-                # Flytt verdier fra "Rabatt" til "Enhetspris_Faktura" der det er feil
-                merged_data["Enhetspris_Faktura"] = merged_data.apply(
-                    lambda row: row["Rabatt"] if pd.isna(row["Enhetspris_Faktura"]) and not pd.isna(row["Rabatt"]) else row["Enhetspris_Faktura"],
-                    axis=1
-                )
-
-                # Fjern verdiene fra rabattkolonnen der de er flyttet
-                merged_data["Rabatt"] = merged_data.apply(
-                    lambda row: None if row["Enhetspris_Faktura"] == row["Rabatt"] else row["Rabatt"],
-                    axis=1
-                )
-
                 # Finne avvik
                 merged_data["Avvik_Antall"] = merged_data["Antall_Faktura"] - merged_data["Antall_Tilbud"]
                 merged_data["Avvik_Enhetspris"] = merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]
@@ -170,41 +159,17 @@ def main():
                 avvik = merged_data[(merged_data["Avvik_Antall"].notna() & (merged_data["Avvik_Antall"] != 0)) |
                                     (merged_data["Avvik_Enhetspris"].notna() & (merged_data["Avvik_Enhetspris"] != 0))]
 
-                with col2:
-                    st.subheader("Avvik mellom Faktura og Tilbud")
-                    st.dataframe(avvik)
-
                 # Artikler som finnes i faktura, men ikke i tilbud
                 only_in_invoice = merged_data[merged_data['Enhetspris_Tilbud'].isna()]
-                with col2:
-                    st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
-                    st.dataframe(only_in_invoice)
 
-                # Lagre kun artikkeldataene til XLSX
-                all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Beløp_Faktura", "Rabatt"]]
-                
-                excel_data = convert_df_to_excel(all_items)
+                # Lagre kombinasjonen av begge tabellene til en Excel-fil
+                combined_excel_data = convert_combined_df_to_excel(avvik, only_in_invoice)
 
                 with col3:
                     st.download_button(
-                        label="Last ned avviksrapport som Excel",
-                        data=convert_df_to_excel(avvik),
-                        file_name="avvik_rapport.xlsx"
-                    )
-                    
-                    st.download_button(
-                        label="Last ned alle varenummer som Excel",
-                        data=excel_data,
-                        file_name="faktura_varer.xlsx",
-                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                    )
-
-                                        # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
-                    only_in_invoice_data = convert_df_to_excel(only_in_invoice)
-                    st.download_button(
-                        label="Last ned varenummer som ikke eksiterer i tilbudet",
-                        data=only_in_invoice_data,
-                        file_name="varer_kun_i_faktura.xlsx",
+                        label="Last ned kombinert rapport som Excel",
+                        data=combined_excel_data,
+                        file_name="kombinert_rapport.xlsx",
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
             else:
@@ -214,3 +179,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

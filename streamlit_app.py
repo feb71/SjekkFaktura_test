@@ -101,6 +101,9 @@ def main():
             # Ekstraher data fra faktura
             invoice_data = extract_data_from_invoice(invoice_file, "Faktura", invoice_number)
 
+            # Vis alle kolonnenavn fra fakturadata for feilsøking
+            st.write("Kolonnenavn i fakturadata:", invoice_data.columns.tolist())
+
             # Les tilbudet fra Excel-filen
             offer_data = pd.read_excel(offer_file)
 

@@ -88,7 +88,8 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
 def convert_df_to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Sheet1')
+        # Fjern kolonner som du ikke vil ha med, som f.eks. "Enhet_Faktura"
+        df.drop(columns=["Enhet_Faktura"], errors="ignore").to_excel(writer, index=False, sheet_name='Sheet1')
     return output.getvalue()
 
 # Hovedfunksjon for Streamlit-appen
@@ -138,7 +139,7 @@ def main():
             if not invoice_data.empty and not offer_data.empty:
                 with col2:
                     st.write("Sammenligner data...")
-                
+
                 # Merge faktura- og tilbudsdataene
                 merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
 
@@ -147,19 +148,6 @@ def main():
                 merged_data["Antall_Tilbud"] = pd.to_numeric(merged_data["Antall_Tilbud"], errors='coerce')
                 merged_data["Enhetspris_Faktura"] = pd.to_numeric(merged_data["Enhetspris_Faktura"], errors='coerce')
                 merged_data["Enhetspris_Tilbud"] = pd.to_numeric(merged_data["Enhetspris_Tilbud"], errors='coerce')
-
-                # Etter at vi har samlet dataene og opprettet merged_data, kan vi legge til en sjekk for å flytte verdiene
-                # Flytt verdier fra "Rabatt" til "Enhetspris_Faktura" der det er feil
-                merged_data["Enhetspris_Faktura"] = merged_data.apply(
-                    lambda row: row["Rabatt"] if pd.isna(row["Enhetspris_Faktura"]) and not pd.isna(row["Rabatt"]) else row["Enhetspris_Faktura"],
-                    axis=1
-                )
-
-                # Fjern verdiene fra rabattkolonnen der de er flyttet
-                merged_data["Rabatt"] = merged_data.apply(
-                    lambda row: None if row["Enhetspris_Faktura"] == row["Rabatt"] else row["Rabatt"],
-                    axis=1
-                )
 
                 # Finne avvik
                 merged_data["Avvik_Antall"] = merged_data["Antall_Faktura"] - merged_data["Antall_Tilbud"]
@@ -199,7 +187,7 @@ def main():
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
 
-                                        # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
+                    # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
                     only_in_invoice_data = convert_df_to_excel(only_in_invoice)
                     st.download_button(
                         label="Last ned varenummer som ikke eksiterer i tilbudet",

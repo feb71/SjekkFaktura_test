@@ -177,12 +177,13 @@ def main():
                 merged_data["Prosentvis_økning"] = ((merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]) / merged_data["Enhetspris_Tilbud"]) * 100
 
                 # Hvis ingen rabatt, sett til None i avvikstabellen
-                # Sjekk først om kolonnen 'Rabatt' eksisterer før vi prøver å fylle den
+                # Hvis kolonnen 'Rabatt' eksisterer, fyll ut eventuelle manglende verdier med Pandas NA (pd.NA)
                 if 'Rabatt' in merged_data.columns:
-                    merged_data['Rabatt'] = merged_data['Rabatt'].fillna(value=None)
+                    merged_data['Rabatt'] = merged_data['Rabatt'].fillna(value=pd.NA)
                 else:
-                    # Hvis kolonnen ikke finnes, opprett den og sett den til None
-                    merged_data['Rabatt'] = None
+                    # Hvis kolonnen ikke finnes, opprett den med verdien pd.NA
+                    merged_data['Rabatt'] = pd.NA
+
 
                 
 

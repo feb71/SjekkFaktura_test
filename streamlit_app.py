@@ -133,6 +133,27 @@ def main():
                 # Merge faktura- og tilbudsdataene
                 merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
 
+                # Funksjon for å trekke ut antall fra slutten av beskrivelsen
+        def extract_quantity_from_description(row):
+            # Vi ser etter et tall på slutten av beskrivelsen
+            match = re.search(r'(\d+)$', row["Beskrivelse_Faktura"])
+            if match:
+            # Hvis vi finner et tall, returner dette som antall
+                return float(match.group(1))
+            return row["Antall_Faktura"]  # Hvis ingen tall finnes, behold opprinnelig verdi (None)
+
+            # Bruk funksjonen for å oppdatere antall_faktura fra beskrivelse_faktura der det er relevant
+        merged_data["Antall_Faktura"] = merged_data.apply(
+            lambda row: extract_quantity_from_description(row) if pd.isna(row["Antall_Faktura"]) else row["Antall_Faktura"],
+            axis=1
+            )
+
+        # Fjern tallet fra beskrivelsen etter at det er trukket ut
+        merged_data["Beskrivelse_Faktura"] = merged_data["Beskrivelse_Faktura"].str.replace(r'\s*\d+$', '', regex=True)
+
+            # Fortsett med resten av koden som før
+
+
                 # Konverter kolonner til numerisk der det er relevant
                 merged_data["Antall_Faktura"] = pd.to_numeric(merged_data["Antall_Faktura"], errors='coerce')
                 merged_data["Antall_Tilbud"] = pd.to_numeric(merged_data["Antall_Tilbud"], errors='coerce')

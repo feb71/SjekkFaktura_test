@@ -35,6 +35,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                 
                 lines = text.split('\n')
                 for line in lines:
+                    # Finn startpunktet i fakturaen
                     if doc_type == "Faktura" and "Artikkel" in line:
                         start_reading = True
                         continue
@@ -46,10 +47,12 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                             if not item_number.isdigit():
                                 continue
 
+                            # Bruker regex for å finne verdier som enhetspris, rabatt og total pris
                             description = " ".join(columns[2:-3])
                             try:
-                                quantity = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else columns[-3]
-                                unit_price = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else columns[-2]
+                                quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else columns[-4]
+                                unit_price = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else columns[-3]
+                                discount = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else None
                                 total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else columns[-1]
                             except ValueError as e:
                                 st.error(f"Kunne ikke konvertere til flyttall: {e}")
@@ -62,8 +65,8 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                                 "Beskrivelse_Faktura": description,
                                 "Antall_Faktura": quantity,
                                 "Enhetspris_Faktura": unit_price,
+                                "Rabatt": discount,  # Ny kolonne for rabatt
                                 "Totalt pris": total_price,
-                                "Rabatt": None,  # Legg til Rabatt som None i alle tilfeller for avvikstabellen
                                 "Type": doc_type
                             })
             if len(data) == 0:
@@ -116,6 +119,8 @@ def main():
     </style>
     """, 
     unsafe_allow_html=True)
+
+
 
     # Opprett tre kolonner
     col1, col2, col3 = st.columns([1, 5, 1])
@@ -171,46 +176,30 @@ def main():
                 merged_data["Enhetspris_Faktura"] = pd.to_numeric(merged_data["Enhetspris_Faktura"], errors='coerce')
                 merged_data["Enhetspris_Tilbud"] = pd.to_numeric(merged_data["Enhetspris_Tilbud"], errors='coerce')
 
+                # Fyll manglende verdier i Rabatt med None
+                merged_data["Rabatt"] = merged_data["Rabatt"].fillna(pd.NA)
+
                 # Finne avvik
                 merged_data["Avvik_Antall"] = merged_data["Antall_Faktura"] - merged_data["Antall_Tilbud"]
                 merged_data["Avvik_Enhetspris"] = merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]
                 merged_data["Prosentvis_økning"] = ((merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]) / merged_data["Enhetspris_Tilbud"]) * 100
 
-                # Hvis ingen rabatt, sett til None i avvikstabellen
-                # Hvis kolonnen 'Rabatt' eksisterer, fyll ut eventuelle manglende verdier med Pandas NA (pd.NA)
-                if 'Rabatt' in merged_data.columns:
-                    merged_data['Rabatt'] = merged_data['Rabatt'].fillna(value=pd.NA)
-                else:
-                    # Hvis kolonnen ikke finnes, opprett den med verdien pd.NA
-                    merged_data['Rabatt'] = pd.NA
-
-
-                
-
                 avvik = merged_data[(merged_data["Avvik_Antall"].notna() & (merged_data["Avvik_Antall"] != 0)) |
                                     (merged_data["Avvik_Enhetspris"].notna() & (merged_data["Avvik_Enhetspris"] != 0))]
 
+                # Vis avvikene i Streamlit
                 with col2:
                     st.subheader("Avvik mellom Faktura og Tilbud")
                     st.dataframe(avvik)
 
-                   # Artikler som finnes i faktura, men ikke i tilbud
+                # Artikler som finnes i faktura, men ikke i tilbud
                 only_in_invoice = merged_data[merged_data['Enhetspris_Tilbud'].isna()]
-
-                # Fyll ut manglende verdier i Rabatt som None
-                only_in_invoice['Rabatt'] = only_in_invoice['Rabatt'].fillna(value=pd.NA)
-
-                # Juster kolonneoppdateringen for riktig plassering av enhetspris og rabatt
-                only_in_invoice = only_in_invoice[['Varenummer', 'Beskrivelse_Faktura', 'Antall_Faktura', 'Enhetspris_Faktura', 'Totalt pris_Faktura', 'Rabatt', 'Type']]
-
-                # Vis tabellen med korrekt justerte verdier
                 with col2:
                     st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
                     st.dataframe(only_in_invoice)
 
-
                 # Lagre kun artikkeldataene til XLSX
-                all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris", "Rabatt"]]
+                all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Rabatt", "Totalt pris"]]
                 
                 excel_data = convert_df_to_excel(all_items)
 
@@ -243,4 +232,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

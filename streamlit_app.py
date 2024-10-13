@@ -155,7 +155,17 @@ def main():
                 # Sammenligne faktura mot tilbud
                 with col2:
                     st.write("Sammenligner data...")
+                # Adjust column name for total price in invoice data
+                invoice_data.rename(columns={
+                "Totalt pris": "Beløp_Faktura"
+                }, inplace=True)
+
+                # Now when merging, we'll also use this updated column name:
                 merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
+
+                # Ensure the correct columns are used when generating the final report
+                all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Beløp_Faktura", "Rabatt"]]
+
 
                 # Debug: Vis det sammenslåtte datasettet
                 st.write("Sammenslåtte data (tilbud og faktura):")

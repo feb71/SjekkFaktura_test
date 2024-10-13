@@ -170,8 +170,7 @@ def main():
                 merged_data["Enhetspris_Faktura"] = pd.to_numeric(merged_data["Enhetspris_Faktura"], errors='coerce')
                 merged_data["Enhetspris_Tilbud"] = pd.to_numeric(merged_data["Enhetspris_Tilbud"], errors='coerce')
 
-                # Fyll ut verdien for Rabatt som 0 der det ikke finnes
-                merged_data["Rabatt"] = merged_data["Rabatt"].fillna(0)
+               
 
                 # Før vi refererer til 'Rabatt', sjekker vi om kolonnen eksisterer, og hvis ikke, oppretter vi den med en standardverdi.
                 if 'Rabatt' not in merged_data.columns:

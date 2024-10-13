@@ -48,11 +48,16 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
 
                             description = " ".join(columns[2:-5])
                             try:
-                                quantity = float(columns[-5].replace('.', '').replace(',', '.')) if columns[-5].replace('.', '').replace(',', '').isdigit() else columns[-5]
-                                unit = columns[-4]  # Trekker ut enheten
-                                unit_price = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else columns[-3]
+                                # Kontroller at 'Antall' er et tall og 'Enhet' er tekst
+                                quantity = float(columns[-5].replace(',', '.')) if columns[-5].replace('.', '').isdigit() else None
+                                unit = columns[-4] if not columns[-4].replace('.', '').isdigit() else None  # Trekker ut enheten som tekst
+                                
+                                # Trekk ut enhetspris og rabatt
+                                unit_price = float(columns[-3].replace(',', '.')) if columns[-3].replace('.', '').isdigit() else None
                                 discount = float(columns[-2].replace(',', '.')) if columns[-2].replace(',', '').isdigit() else 0  # Rabatt
-                                total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else columns[-1]
+                                
+                                # Total pris
+                                total_price = float(columns[-1].replace(',', '.')) if columns[-1].replace('.', '').isdigit() else None
                             except ValueError as e:
                                 st.error(f"Kunne ikke konvertere til flyttall: {e}")
                                 continue
@@ -62,11 +67,11 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                                 "UnikID": unique_id,
                                 "Varenummer": item_number,
                                 "Beskrivelse_Faktura": description,
-                                "Antall_Faktura": quantity,
-                                "Enhet_Faktura": unit,  # Enhet kolonne
-                                "Enhetspris_Faktura": unit_price,
-                                "Rabatt": discount,  # Rabatt kolonne
-                                "Totalt pris": total_price,
+                                "Antall_Faktura": quantity if quantity else None,
+                                "Enhet_Faktura": unit if unit else None,  # Enhet kolonne som tekst
+                                "Enhetspris_Faktura": unit_price if unit_price else None,
+                                "Rabatt": discount if discount else 0,  # Rabatt kolonne
+                                "Totalt pris": total_price if total_price else None,
                                 "Type": doc_type
                             })
             if len(data) == 0:
@@ -76,6 +81,8 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
     except Exception as e:
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
+
+
 
 
 

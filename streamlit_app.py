@@ -96,28 +96,21 @@ def convert_df_to_excel(df):
         df.to_excel(writer, index=False, sheet_name='Sheet1')
     return output.getvalue()
 
-# Hovedfunksjon for Streamlit-appen
+def extract_quantity_for_missing_items(data):
+    # Denne funksjonen brukes kun for å trekke ut antall fra beskrivelsen for varer som ikke finnes i tilbudet
+    for idx, row in data.iterrows():
+        description = row["Beskrivelse_Faktura"]
+        match = re.search(r'(\d+)\s*$', description)  # Matcher et tall på slutten av beskrivelsen
+        if match:
+            quantity = match.group(1)
+            data.at[idx, "Antall_Faktura"] = float(quantity)  # Oppdaterer Antall_Faktura med verdien
+            data.at[idx, "Beskrivelse_Faktura"] = description[:match.start()].strip()  # Fjerner antallet fra beskrivelsen
+    return data
+
+# Oppdater hovedfunksjonen for å bare bruke dette på varenummer som ikke finnes i tilbudet
 def main():
     st.title("Sammenlign Faktura mot Tilbud")
-    st.markdown("""
-    <style>
-        .dataframe th {
-            font-weight: bold !important;  /* Gjør kolonneoverskriftene fet */
-        }
-    </style>
-    """, unsafe_allow_html=True)
 
-    st.markdown("""
-    <style>
-    .css-1n76uvr thead th {
-        font-size: 36px !important;
-        color: #FFFFFF !important;
-        background-color: #333333 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Opprett tre kolonner
     col1, col2, col3 = st.columns([1, 5, 1])
 
     with col1:
@@ -126,7 +119,6 @@ def main():
         offer_file = st.file_uploader("Last opp tilbud fra Brødrene Dahl (Excel)", type="xlsx")
 
     if invoice_file and offer_file:
-        # Hent fakturanummer
         with col1:
             st.info("Henter fakturanummer fra faktura...")
             invoice_number = get_invoice_number(invoice_file)
@@ -135,7 +127,7 @@ def main():
             with col1:
                 st.success(f"Fakturanummer funnet: {invoice_number}")
             
-            # Ekstraher data fra PDF-filer
+            # Ekstraher data fra PDF-filen
             with col1:
                 st.info("Laster inn faktura...")
             invoice_data = extract_data_from_pdf(invoice_file, "Faktura", invoice_number)
@@ -159,21 +151,11 @@ def main():
             if not invoice_data.empty:
                 invoice_data = split_description(invoice_data, "Faktura")
 
-            # Trekk ut antall fra beskrivelsen der det er nødvendig
-            if not invoice_data.empty:
-                invoice_data["Antall_Faktura"] = invoice_data.apply(
-                    lambda row: extract_quantity_from_description(row) if pd.isna(row["Antall_Faktura"]) else row["Antall_Faktura"],
-                    axis=1
-                )
-                invoice_data["Beskrivelse_Faktura"] = invoice_data["Beskrivelse_Faktura"].str.replace(r'\s*\d+$', '', regex=True)
-
             if not offer_data.empty:
-                # Sammenligne faktura mot tilbud
                 with col2:
                     st.write("Sammenligner data...")
                 merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
 
-                # Konverter kolonner til numerisk
                 merged_data["Antall_Faktura"] = pd.to_numeric(merged_data["Antall_Faktura"], errors='coerce')
                 merged_data["Antall_Tilbud"] = pd.to_numeric(merged_data["Antall_Tilbud"], errors='coerce')
                 merged_data["Enhetspris_Faktura"] = pd.to_numeric(merged_data["Enhetspris_Faktura"], errors='coerce')
@@ -184,28 +166,26 @@ def main():
                 merged_data["Avvik_Enhetspris"] = merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]
                 merged_data["Prosentvis_økning"] = ((merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]) / merged_data["Enhetspris_Tilbud"]) * 100
 
-                avvik = merged_data[(merged_data["Avvik_Antall"].notna() & (merged_data["Avvik_Antall"] != 0)) |
-                                    (merged_data["Avvik_Enhetspris"].notna() & (merged_data["Avvik_Enhetspris"] != 0))]
+                # Filter for varer som finnes i faktura, men ikke i tilbudet
+                only_in_invoice = merged_data[merged_data['Enhetspris_Tilbud'].isna()]
+
+                # Anvende extract_quantity_for_missing_items kun for "varenummer som finnes i faktura, men ikke i tilbud"
+                only_in_invoice = extract_quantity_for_missing_items(only_in_invoice)
 
                 with col2:
                     st.subheader("Avvik mellom Faktura og Tilbud")
-                    st.dataframe(avvik)
+                    st.dataframe(merged_data)
 
-                # Artikler som finnes i faktura, men ikke i tilbud
-                only_in_invoice = merged_data[merged_data['Enhetspris_Tilbud'].isna()]
-                with col2:
                     st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
                     st.dataframe(only_in_invoice)
 
-                # Lagre kun artikkeldataene til XLSX
                 all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Beløp_Faktura", "Rabatt"]]
-
                 excel_data = convert_df_to_excel(all_items)
 
                 with col3:
                     st.download_button(
                         label="Last ned avviksrapport som Excel",
-                        data=convert_df_to_excel(avvik),
+                        data=convert_df_to_excel(merged_data),
                         file_name="avvik_rapport.xlsx"
                     )
                     
@@ -216,7 +196,6 @@ def main():
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
 
-                    # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
                     only_in_invoice_data = convert_df_to_excel(only_in_invoice)
                     st.download_button(
                         label="Last ned varenummer som ikke eksiterer i tilbudet",
@@ -231,4 +210,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

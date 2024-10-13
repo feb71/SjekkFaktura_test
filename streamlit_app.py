@@ -46,9 +46,17 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                             if not item_number.isdigit():
                                 continue
 
+                            # Trekke ut beskrivelse, og antall hvis det finnes på slutten av beskrivelsen
                             description = " ".join(columns[2:-4])
                             try:
-                                quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else columns[-4]
+                                # Hvis antall er inkludert i beskrivelsen (for varer kun i faktura)
+                                antall_fra_beskrivelse = re.search(r'(\d+)\s*$', description)
+                                if antall_fra_beskrivelse:
+                                    quantity = float(antall_fra_beskrivelse.group(1).replace('.', '').replace(',', '.'))
+                                    description = re.sub(r'\s*\d+\s*$', '', description)
+                                else:
+                                    quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else columns[-4]
+                                
                                 unit_price = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else columns[-3]
                                 discount = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else 0  # Sett rabatt til 0 hvis tom
                                 total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else columns[-1]
@@ -74,6 +82,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
     except Exception as e:
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
+
 
 # Funksjon for å konvertere DataFrame til en Excel-fil
 def convert_df_to_excel(df):

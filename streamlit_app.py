@@ -48,16 +48,16 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
 
                             description = " ".join(columns[2:-5])
                             try:
-                                # Kontroller at 'Antall' er et tall og 'Enhet' er tekst
-                                quantity = float(columns[-5].replace(',', '.')) if columns[-5].replace('.', '').isdigit() else None
-                                unit = columns[-4] if not columns[-4].replace('.', '').isdigit() else None  # Trekker ut enheten som tekst
+                                # Kontroller at 'Antall' er et tall, og sørg for at desimaltegnet for priser er komma
+                                quantity = float(columns[-5].replace('.', '').replace(',', '.')) if columns[-5].replace(',', '').isdigit() else None
+                                unit = columns[-4] if not columns[-4].replace(',', '').isdigit() else None  # Trekker ut enheten som tekst
                                 
-                                # Trekk ut enhetspris og rabatt
-                                unit_price = float(columns[-3].replace(',', '.')) if columns[-3].replace('.', '').isdigit() else None
-                                discount = float(columns[-2].replace(',', '.')) if columns[-2].replace(',', '').isdigit() else 0  # Rabatt
+                                # Trekk ut enhetspris og rabatt, håndter valuta med komma
+                                unit_price = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace(',', '').replace('.', '').isdigit() else None
+                                discount = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace(',', '').replace('.', '').isdigit() else 0  # Rabatt
                                 
-                                # Total pris
-                                total_price = float(columns[-1].replace(',', '.')) if columns[-1].replace('.', '').isdigit() else None
+                                # Total pris, håndter valuta med komma
+                                total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace(',', '').replace('.', '').isdigit() else None
                             except ValueError as e:
                                 st.error(f"Kunne ikke konvertere til flyttall: {e}")
                                 continue
@@ -81,6 +81,8 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
     except Exception as e:
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
+
+
 
 
 

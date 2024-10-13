@@ -20,7 +20,7 @@ def get_invoice_number(file):
         st.error(f"Kunne ikke lese fakturanummer fra PDF: {e}")
         return None
 
-# Funksjon for å lese PDF-filen og hente ut relevante data
+# Funksjon for å lese PDF-filen og hente ut relevante data inkludert enhet
 def extract_data_from_pdf(file, doc_type, invoice_number=None):
     try:
         with pdfplumber.open(file) as pdf:
@@ -41,7 +41,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
 
                     if start_reading:
                         columns = line.split()
-                        if len(columns) >= 6:  # Endret for å håndtere rabatt også
+                        if len(columns) >= 6:  # For å sikre at vi har nok kolonner for varenummer, beskrivelse, antall, enhet osv.
                             item_number = columns[1]
                             if not item_number.isdigit():
                                 continue
@@ -49,8 +49,8 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                             description = " ".join(columns[2:-4])
                             try:
                                 quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else columns[-4]
-                                unit_price = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else columns[-3]
-                                discount = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else 0  # Rabatt
+                                unit = columns[-3]  # Her trekker vi ut enheten, som er tekst
+                                unit_price = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else columns[-2]
                                 total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else columns[-1]
                             except ValueError as e:
                                 st.error(f"Kunne ikke konvertere til flyttall: {e}")
@@ -62,9 +62,9 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                                 "Varenummer": item_number,
                                 "Beskrivelse_Faktura": description,
                                 "Antall_Faktura": quantity,
+                                "Enhet_Faktura": unit,  # Legg til enhet som tekstkolonne
                                 "Enhetspris_Faktura": unit_price,
-                                "Rabatt": discount,  # Rabatt
-                                "Totalt pris_Faktura": total_price,
+                                "Totalt pris": total_price,
                                 "Type": doc_type
                             })
             if len(data) == 0:
@@ -74,6 +74,8 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
     except Exception as e:
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
+
+
 
 # Funksjon for å konvertere DataFrame til en Excel-fil
 def convert_df_to_excel(df):

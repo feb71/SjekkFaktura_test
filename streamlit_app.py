@@ -114,6 +114,12 @@ def main():
                 'TOTALPRIS': 'Tilbud_Totalt_pris'
             }, inplace=True)
 
+            # Feilsøking: Sjekk om "Varenummer" finnes i begge datasett
+            if "Varenummer" not in offer_data.columns:
+                st.error("Kolonnen 'Varenummer' finnes ikke i tilbudsdataene.")
+            if "Varenummer" not in invoice_data.columns:
+                st.error("Kolonnen 'Varenummer' finnes ikke i fakturadataene.")
+
             # Sammenligne faktura mot tilbud (avvikstabell)
             merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='inner', suffixes=('_Tilbud', '_Faktura'))
 

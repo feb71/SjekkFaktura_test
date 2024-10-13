@@ -178,16 +178,17 @@ def main():
 
                 with col3:
                     st.download_button(
-                        label="Last ned avviksrapport som Excel",
-                        data=convert_df_to_excel(avvik),
-                        file_name="avvik_rapport.xlsx"
+                    label="Last ned avviksrapport som Excel",
+                    data=convert_df_to_excel(avvik),
+                    file_name="avvik_rapport.xlsx",
+                    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
-                    
+
                     st.download_button(
-                        label="Last ned alle varenummer som Excel"
-                        data=excel_data,
-                        file_name="faktura_varer.xlsx",
-                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    label="Last ned alle varenummer som Excel",
+                    data=excel_data,
+                    file_name="faktura_varer.xlsx",
+                    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
 
                     # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
@@ -198,6 +199,7 @@ def main():
                         file_name="varer_kun_i_faktura.xlsx",
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
+
             else:
                 st.error("Kunne ikke lese tilbudsdata fra Excel-filen.")
         else:

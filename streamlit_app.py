@@ -45,12 +45,12 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                             if not item_number.isdigit():
                                 continue
 
-                            # Beskrivelse og enhet
+                            # Finner beskrivelse, antall, og enhet
                             description = " ".join(columns[2:-5])
-                            unit = columns[-5]  # Enhet er plassert rett før priskolonnene
-
+                            unit = columns[-5] if not columns[-5].isdigit() else ""
+                            
                             try:
-                                # Hent ut antall fra beskrivelsen hvis det er plassert der, ellers bruk standardplassering
+                                # Sjekk for antall i beskrivelsen eller i riktig posisjon
                                 antall_fra_beskrivelse = re.search(r'(\d+)\s*$', description)
                                 if antall_fra_beskrivelse:
                                     quantity = float(antall_fra_beskrivelse.group(1).replace('.', '').replace(',', '.'))
@@ -58,6 +58,7 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                                 else:
                                     quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else columns[-4]
                                 
+                                # Trekker ut de andre verdiene
                                 unit_price = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else columns[-3]
                                 discount = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else 0  # Sett rabatt til 0 hvis tom
                                 total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else columns[-1]

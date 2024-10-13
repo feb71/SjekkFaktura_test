@@ -20,8 +20,8 @@ def get_invoice_number(file):
         st.error(f"Kunne ikke lese fakturanummer fra PDF: {e}")
         return None
 
-# Funksjon for å lese faktura og returnere data uten rabatt (for avvikstabellen)
-def extract_data_for_avvik(file, doc_type, invoice_number=None):
+# Funksjon for å lese faktura med spesifikke kolonner og ignorere tomme
+def extract_data_from_invoice(file, doc_type, invoice_number=None):
     try:
         with pdfplumber.open(file) as pdf:
             data = []
@@ -32,7 +32,7 @@ def extract_data_for_avvik(file, doc_type, invoice_number=None):
                 if text is None:
                     st.error(f"Ingen tekst funnet på side {page.page_number} i PDF-filen.")
                     continue
-                
+
                 lines = text.split('\n')
                 for line in lines:
                     if doc_type == "Faktura" and "Artikkel" in line:
@@ -41,15 +41,17 @@ def extract_data_for_avvik(file, doc_type, invoice_number=None):
 
                     if start_reading:
                         columns = line.split()
-                        if len(columns) >= 5:
+                        if len(columns) >= 7:
                             item_number = columns[1]
                             if not item_number.isdigit():
                                 continue
 
-                            description = " ".join(columns[2:-3])
+                            description = " ".join(columns[2:-5])
                             try:
-                                quantity = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else None
-                                unit_price = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else None
+                                quantity = float(columns[-5].replace('.', '').replace(',', '.')) if columns[-5].replace('.', '').replace(',', '').isdigit() else None
+                                unit = columns[-4]
+                                unit_price = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else None
+                                discount = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else None
                                 total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else None
                             except ValueError as e:
                                 st.error(f"Kunne ikke konvertere til flyttall: {e}")
@@ -61,60 +63,10 @@ def extract_data_for_avvik(file, doc_type, invoice_number=None):
                                 "Varenummer": item_number,
                                 "Faktura_Beskrivelse": description,
                                 "Faktura_Antall": quantity,
+                                "Faktura_Enhet": unit,
                                 "Faktura_Enhetspris": unit_price,
-                                "Faktura_Beløp": total_price,  # Endret til Faktura_Beløp
-                                "Type": doc_type
-                            })
-            return pd.DataFrame(data)
-    except Exception as e:
-        st.error(f"Kunne ikke lese data fra PDF: {e}")
-        return pd.DataFrame()
-
-# Funksjon for å lese faktura med rabatt (for manglende tilbudsartikler)
-def extract_data_with_rabatt(file, doc_type, invoice_number=None):
-    try:
-        with pdfplumber.open(file) as pdf:
-            data = []
-            start_reading = False
-
-            for page in pdf.pages:
-                text = page.extract_text()
-                if text is None:
-                    st.error(f"Ingen tekst funnet på side {page.page_number} i PDF-filen.")
-                    continue
-                
-                lines = text.split('\n')
-                for line in lines:
-                    if doc_type == "Faktura" and "Artikkel" in line:
-                        start_reading = True
-                        continue
-
-                    if start_reading:
-                        columns = line.split()
-                        if len(columns) >= 6:
-                            item_number = columns[1]
-                            if not item_number.isdigit():
-                                continue
-
-                            description = " ".join(columns[2:-4])
-                            try:
-                                quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else None
-                                discount = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else None
-                                unit_price = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else None
-                                total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else None
-                            except ValueError as e:
-                                st.error(f"Kunne ikke konvertere til flyttall: {e}")
-                                continue
-
-                            unique_id = f"{invoice_number}_{item_number}" if invoice_number else item_number
-                            data.append({
-                                "UnikID": unique_id,
-                                "Varenummer": item_number,
-                                "Faktura_Beskrivelse": description,
-                                "Faktura_Antall": quantity,
                                 "Rabatt": discount,
-                                "Faktura_Enhetspris": unit_price,
-                                "Faktura_Beløp": total_price,  # Endret til Faktura_Beløp
+                                "Faktura_Beløp": total_price,
                                 "Type": doc_type
                             })
             return pd.DataFrame(data)
@@ -125,7 +77,7 @@ def extract_data_with_rabatt(file, doc_type, invoice_number=None):
 # Hovedfunksjon for Streamlit-appen
 def main():
     st.title("Sammenlign Faktura mot Tilbud")
-    
+
     # Opprett tre kolonner
     col1, col2, col3 = st.columns([1, 5, 1])
 
@@ -140,12 +92,9 @@ def main():
 
         if invoice_number:
             st.success(f"Fakturanummer funnet: {invoice_number}")
-            
-            # Ekstraher data for avvikstabellen uten rabatt
-            invoice_data_avvik = extract_data_for_avvik(invoice_file, "Faktura", invoice_number)
 
-            # Ekstraher data med rabatt for manglende artikler
-            invoice_data_rabatt = extract_data_with_rabatt(invoice_file, "Faktura", invoice_number)
+            # Ekstraher data fra faktura
+            invoice_data = extract_data_from_invoice(invoice_file, "Faktura", invoice_number)
 
             # Les tilbudet fra Excel-filen
             offer_data = pd.read_excel(offer_file)
@@ -161,7 +110,7 @@ def main():
             }, inplace=True)
 
             # Sammenligne faktura mot tilbud (avvikstabell)
-            merged_data = pd.merge(offer_data, invoice_data_avvik, on="Varenummer", how='inner', suffixes=('_Tilbud', '_Faktura'))
+            merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='inner', suffixes=('_Tilbud', '_Faktura'))
 
             # Finne avvik
             merged_data["Avvik_Antall"] = merged_data["Faktura_Antall"] - merged_data["Tilbud_Antall"]
@@ -171,10 +120,10 @@ def main():
             st.subheader("Avvik mellom Faktura og Tilbud")
             st.dataframe(merged_data)
 
-            # Artikler som finnes i faktura, men ikke i tilbud (med rabatt)
-            unmatched_items = pd.merge(offer_data, invoice_data_rabatt, on="Varenummer", how="outer", indicator=True)
+            # Artikler som finnes i faktura, men ikke i tilbud
+            unmatched_items = pd.merge(offer_data, invoice_data, on="Varenummer", how="outer", indicator=True)
             only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][["Varenummer", "Faktura_Beskrivelse", "Faktura_Antall", "Faktura_Enhetspris", "Faktura_Beløp", "Rabatt"]]
-            
+
             st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
             st.dataframe(only_in_invoice)
 

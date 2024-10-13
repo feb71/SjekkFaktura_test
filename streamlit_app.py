@@ -46,17 +46,9 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                             if not item_number.isdigit():
                                 continue
 
-                            # Trekke ut beskrivelse, og antall hvis det finnes på slutten av beskrivelsen
                             description = " ".join(columns[2:-4])
                             try:
-                                # Hvis antall er inkludert i beskrivelsen (for varer kun i faktura)
-                                antall_fra_beskrivelse = re.search(r'(\d+)\s*$', description)
-                                if antall_fra_beskrivelse:
-                                    quantity = float(antall_fra_beskrivelse.group(1).replace('.', '').replace(',', '.'))
-                                    description = re.sub(r'\s*\d+\s*$', '', description)
-                                else:
-                                    quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else columns[-4]
-                                
+                                quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else columns[-4]
                                 unit_price = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else columns[-3]
                                 discount = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else 0  # Sett rabatt til 0 hvis tom
                                 total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else columns[-1]
@@ -83,13 +75,12 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
 
-
 # Funksjon for å konvertere DataFrame til en Excel-fil
 def convert_df_to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         # Fjern kolonner som du ikke vil ha med, som f.eks. "Enhet_Faktura"
-        df.drop(columns=["Enhet_Faktura"], errors="ignore").to_excel(writer, index=False, sheet_name='Sheet1')
+        df.to_excel(writer, index=False, sheet_name='Sheet1')
     return output.getvalue()
 
 # Hovedfunksjon for Streamlit-appen
@@ -149,6 +140,18 @@ def main():
                 merged_data["Enhetspris_Faktura"] = pd.to_numeric(merged_data["Enhetspris_Faktura"], errors='coerce')
                 merged_data["Enhetspris_Tilbud"] = pd.to_numeric(merged_data["Enhetspris_Tilbud"], errors='coerce')
 
+                # Flytt rabatt til Enhetspris_Faktura hvis det er manglende verdi i Enhetspris_Faktura
+                merged_data["Enhetspris_Faktura"] = merged_data.apply(
+                    lambda row: row["Rabatt"] if pd.isna(row["Enhetspris_Faktura"]) and not pd.isna(row["Rabatt"]) else row["Enhetspris_Faktura"],
+                    axis=1
+                )
+
+                # Nullstill Rabatt hvor verdien har blitt flyttet til Enhetspris_Faktura
+                merged_data["Rabatt"] = merged_data.apply(
+                    lambda row: None if row["Enhetspris_Faktura"] == row["Rabatt"] else row["Rabatt"],
+                    axis=1
+                )
+
                 # Finne avvik
                 merged_data["Avvik_Antall"] = merged_data["Antall_Faktura"] - merged_data["Antall_Tilbud"]
                 merged_data["Avvik_Enhetspris"] = merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]
@@ -181,7 +184,7 @@ def main():
                     )
                     
                     st.download_button(
-                        label="Last ned alle varenummer som Excel",
+                        label="Last ned alle varenummer som Excel"
                         data=excel_data,
                         file_name="faktura_varer.xlsx",
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -202,3 +205,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -6,6 +6,20 @@ from io import BytesIO
 
 st.set_page_config(page_title="Streamlit App", layout="wide", initial_sidebar_state="expanded")
 
+# Funksjon for å lese fakturanummer fra PDF
+def get_invoice_number(file):
+    try:
+        with pdfplumber.open(file) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                match = re.search(r"Fakturanummer\s*[:\-]?\s*(\d+)", text, re.IGNORECASE)
+                if match:
+                    return match.group(1)
+        return None
+    except Exception as e:
+        st.error(f"Kunne ikke lese fakturanummer fra PDF: {e}")
+        return None
+
 # Funksjon for å lese faktura og returnere data uten rabatt (for avvikstabellen)
 def extract_data_for_avvik(file, doc_type, invoice_number=None):
     try:
@@ -45,10 +59,10 @@ def extract_data_for_avvik(file, doc_type, invoice_number=None):
                             data.append({
                                 "UnikID": unique_id,
                                 "Varenummer": item_number,
-                                "Beskrivelse_Faktura": description,
-                                "Antall_Faktura": quantity,
-                                "Enhetspris_Faktura": unit_price,
-                                "Totalt pris": total_price,
+                                "Faktura_Beskrivelse": description,
+                                "Faktura_Antall": quantity,
+                                "Faktura_Enhetspris": unit_price,
+                                "Faktura_Totalt_pris": total_price,
                                 "Type": doc_type
                             })
             return pd.DataFrame(data)
@@ -96,11 +110,11 @@ def extract_data_with_rabatt(file, doc_type, invoice_number=None):
                             data.append({
                                 "UnikID": unique_id,
                                 "Varenummer": item_number,
-                                "Beskrivelse_Faktura": description,
-                                "Antall_Faktura": quantity,
+                                "Faktura_Beskrivelse": description,
+                                "Faktura_Antall": quantity,
                                 "Rabatt": discount,
-                                "Enhetspris_Faktura": unit_price,
-                                "Totalt pris": total_price,
+                                "Faktura_Enhetspris": unit_price,
+                                "Faktura_Totalt_pris": total_price,
                                 "Type": doc_type
                             })
             return pd.DataFrame(data)
@@ -139,27 +153,27 @@ def main():
             # Riktige kolonnenavn fra Excel-filen for tilbud
             offer_data.rename(columns={
                 'VARENR': 'Varenummer',
-                'BESKRIVELSE': 'Beskrivelse_Tilbud',
-                'ANTALL': 'Antall_Tilbud',
-                'ENHET': 'Enhet_Tilbud',
-                'ENHETSPRIS': 'Enhetspris_Tilbud',
-                'TOTALPRIS': 'Totalt pris'
+                'BESKRIVELSE': 'Tilbud_Beskrivelse',
+                'ANTALL': 'Tilbud_Antall',
+                'ENHET': 'Tilbud_Enhet',
+                'ENHETSPRIS': 'Tilbud_Enhetspris',
+                'TOTALPRIS': 'Tilbud_Totalt_pris'
             }, inplace=True)
 
             # Sammenligne faktura mot tilbud (avvikstabell)
             merged_data = pd.merge(offer_data, invoice_data_avvik, on="Varenummer", how='inner', suffixes=('_Tilbud', '_Faktura'))
 
             # Finne avvik
-            merged_data["Avvik_Antall"] = merged_data["Antall_Faktura"] - merged_data["Antall_Tilbud"]
-            merged_data["Avvik_Enhetspris"] = merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]
-            merged_data["Prosentvis_økning"] = ((merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]) / merged_data["Enhetspris_Tilbud"]) * 100
+            merged_data["Avvik_Antall"] = merged_data["Faktura_Antall"] - merged_data["Tilbud_Antall"]
+            merged_data["Avvik_Enhetspris"] = merged_data["Faktura_Enhetspris"] - merged_data["Tilbud_Enhetspris"]
+            merged_data["Prosentvis_økning"] = ((merged_data["Faktura_Enhetspris"] - merged_data["Tilbud_Enhetspris"]) / merged_data["Tilbud_Enhetspris"]) * 100
 
             st.subheader("Avvik mellom Faktura og Tilbud")
             st.dataframe(merged_data)
 
             # Artikler som finnes i faktura, men ikke i tilbud (med rabatt)
             unmatched_items = pd.merge(offer_data, invoice_data_rabatt, on="Varenummer", how="outer", indicator=True)
-            only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][["Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Totalt pris", "Rabatt"]]
+            only_in_invoice = unmatched_items[unmatched_items['_merge'] == 'right_only'][["Varenummer", "Faktura_Beskrivelse", "Faktura_Antall", "Faktura_Enhetspris", "Faktura_Totalt_pris", "Rabatt"]]
             
             st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
             st.dataframe(only_in_invoice)

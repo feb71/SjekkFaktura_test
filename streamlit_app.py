@@ -190,7 +190,7 @@ def main():
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
 
-                    # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
+                                        # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
                     only_in_invoice_data = convert_df_to_excel(only_in_invoice)
                     st.download_button(
                         label="Last ned varenummer som ikke eksiterer i tilbudet",
@@ -205,3 +205,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

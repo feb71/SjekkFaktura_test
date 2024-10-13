@@ -1,11 +1,10 @@
-
 import streamlit as st
 import pdfplumber
 import pandas as pd
 import re
 from io import BytesIO
 
-st.set_page_config(page_title="Streamlit App", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Sammenlign Faktura mot Tilbud", layout="wide", initial_sidebar_state="expanded")
 
 # Funksjon for å lese fakturanummer fra PDF
 def get_invoice_number(file):
@@ -47,10 +46,8 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
                             if not item_number.isdigit():
                                 continue
 
-                            # Trekke ut beskrivelse, og antall hvis det finnes på slutten av beskrivelsen
                             description = " ".join(columns[2:-4])
                             try:
-                                # Hvis antall er inkludert i beskrivelsen (for varer kun i faktura)
                                 antall_fra_beskrivelse = re.search(r'(\d+)\s*$', description)
                                 if antall_fra_beskrivelse:
                                     quantity = float(antall_fra_beskrivelse.group(1).replace('.', '').replace(',', '.'))
@@ -84,27 +81,13 @@ def extract_data_from_pdf(file, doc_type, invoice_number=None):
         st.error(f"Kunne ikke lese data fra PDF: {e}")
         return pd.DataFrame()
 
-# Kombiner tabellene til en for nedlasting
-combined_data = pd.concat([merged_data, only_in_invoice])
 
 # Funksjon for å konvertere DataFrame til en Excel-fil
-def convert_combined_df_to_excel(df):
+def convert_df_to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Faktura_og_Tilbud')
+        df.to_excel(writer, index=False, sheet_name='Sheet1')
     return output.getvalue()
-
-# Opprett nedlastingsknappen for den kombinerte tabellen
-with col3:
-    st.download_button(
-        label="Last ned alle data som én Excel-fil",
-        data=convert_combined_df_to_excel(combined_data),
-        file_name="faktura_og_tilbud.xlsx",
-        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-
-
-
 
 # Hovedfunksjon for Streamlit-appen
 def main():
@@ -164,7 +147,6 @@ def main():
                 merged_data["Enhetspris_Tilbud"] = pd.to_numeric(merged_data["Enhetspris_Tilbud"], errors='coerce')
 
                 # Etter at vi har samlet dataene og opprettet merged_data, kan vi legge til en sjekk for å flytte verdiene
-                # Flytt verdier fra "Rabatt" til "Enhetspris_Faktura" der det er feil
                 merged_data["Enhetspris_Faktura"] = merged_data.apply(
                     lambda row: row["Rabatt"] if pd.isna(row["Enhetspris_Faktura"]) and not pd.isna(row["Rabatt"]) else row["Enhetspris_Faktura"],
                     axis=1
@@ -195,33 +177,20 @@ def main():
                     st.subheader("Varenummer som finnes i faktura, men ikke i tilbud")
                     st.dataframe(only_in_invoice)
 
-                # Lagre kun artikkeldataene til XLSX
-                all_items = invoice_data[["UnikID", "Varenummer", "Beskrivelse_Faktura", "Antall_Faktura", "Enhetspris_Faktura", "Beløp_Faktura", "Rabatt"]]
-                
-                excel_data = convert_df_to_excel(all_items)
+                # Kombiner avvik og only_in_invoice til én DataFrame
+                combined_data = pd.concat([avvik, only_in_invoice])
 
+                # Lagre kun artikkeldataene til XLSX
+                excel_data = convert_df_to_excel(combined_data)
+                # Nedlastingsknapp for å laste ned hele den kombinerte tabellen
                 with col3:
                     st.download_button(
-                        label="Last ned avviksrapport som Excel",
-                        data=convert_df_to_excel(avvik),
-                        file_name="avvik_rapport.xlsx"
-                    )
-                    
-                    st.download_button(
-                        label="Last ned alle varenummer som Excel",
+                        label="Last ned alle varenummer og avvik som Excel",
                         data=excel_data,
-                        file_name="faktura_varer.xlsx",
+                        file_name="alle_varer_og_avvik.xlsx",
                         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
 
-                                        # Lag en Excel-fil med varenummer som finnes i faktura, men ikke i tilbud
-                    only_in_invoice_data = convert_df_to_excel(only_in_invoice)
-                    st.download_button(
-                        label="Last ned varenummer som ikke eksiterer i tilbudet",
-                        data=only_in_invoice_data,
-                        file_name="varer_kun_i_faktura.xlsx",
-                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                    )
             else:
                 st.error("Kunne ikke lese tilbudsdata fra Excel-filen.")
         else:
@@ -229,3 +198,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

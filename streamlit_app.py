@@ -97,17 +97,18 @@ def convert_df_to_excel(df):
     return output.getvalue()
 
 def extract_quantity_for_missing_items(data):
-    # Denne funksjonen brukes kun for å trekke ut antall fra beskrivelsen for varer som ikke finnes i tilbudet
+    # Denne funksjonen trekker ut antallet fra beskrivelsen for varer som ikke finnes i tilbudet
     for idx, row in data.iterrows():
-        description = row["Beskrivelse_Faktura"]
-        match = re.search(r'(\d+)\s*$', description)  # Matcher et tall på slutten av beskrivelsen
-        if match:
-            quantity = match.group(1)
-            data.at[idx, "Antall_Faktura"] = float(quantity)  # Oppdaterer Antall_Faktura med verdien
-            data.at[idx, "Beskrivelse_Faktura"] = description[:match.start()].strip()  # Fjerner antallet fra beskrivelsen
+        if pd.isna(row['Antall_Faktura']) and not pd.isna(row['Beskrivelse_Faktura']):
+            description = row['Beskrivelse_Faktura']
+            match = re.search(r'(\d+)\s*$', description)  # Matcher tall på slutten av beskrivelsen
+            if match:
+                quantity = match.group(1)
+                data.at[idx, 'Antall_Faktura'] = float(quantity)  # Oppdaterer Antall_Faktura
+                data.at[idx, 'Beskrivelse_Faktura'] = description[:match.start()].strip()  # Fjerner antallet fra beskrivelsen
     return data
 
-# Oppdater hovedfunksjonen for å bare bruke dette på varenummer som ikke finnes i tilbudet
+# Hovedfunksjonen
 def main():
     st.title("Sammenlign Faktura mot Tilbud")
 
@@ -156,6 +157,7 @@ def main():
                     st.write("Sammenligner data...")
                 merged_data = pd.merge(offer_data, invoice_data, on="Varenummer", how='outer', suffixes=('_Tilbud', '_Faktura'))
 
+                # Konverter kolonner til numerisk
                 merged_data["Antall_Faktura"] = pd.to_numeric(merged_data["Antall_Faktura"], errors='coerce')
                 merged_data["Antall_Tilbud"] = pd.to_numeric(merged_data["Antall_Tilbud"], errors='coerce')
                 merged_data["Enhetspris_Faktura"] = pd.to_numeric(merged_data["Enhetspris_Faktura"], errors='coerce')
@@ -210,3 +212,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

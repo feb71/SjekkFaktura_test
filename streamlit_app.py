@@ -99,7 +99,7 @@ def extract_data_with_rabatt(file, doc_type, invoice_number=None):
                             description = " ".join(columns[2:-4])
                             try:
                                 quantity = float(columns[-4].replace('.', '').replace(',', '.')) if columns[-4].replace('.', '').replace(',', '').isdigit() else None
-                                discount = columns[-3]
+                                discount = float(columns[-3].replace('.', '').replace(',', '.')) if columns[-3].replace('.', '').replace(',', '').isdigit() else None
                                 unit_price = float(columns[-2].replace('.', '').replace(',', '.')) if columns[-2].replace('.', '').replace(',', '').isdigit() else None
                                 total_price = float(columns[-1].replace('.', '').replace(',', '.')) if columns[-1].replace('.', '').replace(',', '').isdigit() else None
                             except ValueError as e:

@@ -139,6 +139,21 @@ def main():
                 merged_data["Enhetspris_Faktura"] = pd.to_numeric(merged_data["Enhetspris_Faktura"], errors='coerce')
                 merged_data["Enhetspris_Tilbud"] = pd.to_numeric(merged_data["Enhetspris_Tilbud"], errors='coerce')
 
+                # Etter at vi har samlet dataene og opprettet merged_data, kan vi legge til en sjekk for å flytte verdiene
+                # Flytt verdier fra "Rabatt" til "Enhetspris_Faktura" der det er feil
+                merged_data["Enhetspris_Faktura"] = merged_data.apply(
+                    lambda row: row["Rabatt"] if pd.isna(row["Enhetspris_Faktura"]) and not pd.isna(row["Rabatt"]) else row["Enhetspris_Faktura"],
+                    axis=1
+                )
+
+                # Fjern verdiene fra rabattkolonnen der de er flyttet
+                merged_data["Rabatt"] = merged_data.apply(
+                    lambda row: None if row["Enhetspris_Faktura"] == row["Rabatt"] else row["Rabatt"],
+                    axis=1
+                )
+
+
+
                 # Finne avvik
                 merged_data["Avvik_Antall"] = merged_data["Antall_Faktura"] - merged_data["Antall_Tilbud"]
                 merged_data["Avvik_Enhetspris"] = merged_data["Enhetspris_Faktura"] - merged_data["Enhetspris_Tilbud"]
